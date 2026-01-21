@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}编辑用户{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-user-edit"></i> 编辑用户 - {{ user.username }}</h1>
+    <a href="{{ url_for('admin.users') }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> 返回
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">用户名</label>
+                        <input type="text" class="form-control" value="{{ user.username }}" disabled>
+                        <small class="text-muted">用户名不可修改</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="password" class="form-label">新密码 (留空表示不修改)</label>
+                        <input type="password" class="form-control" id="password" name="password">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="real_name" class="form-label">真实姓名</label>
+                        <input type="text" class="form-control" id="real_name" name="real_name" value="{{ user.real_name or '' }}">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="role" class="form-label">角色 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="role" name="role" required>
+                            <option value="Data_admin" {% if user.role == 'Data_admin' %}selected{% endif %}>Data_admin (数据管理员)</option>
+                            <option value="BU_admin" {% if user.role == 'BU_admin' %}selected{% endif %}>BU_admin (BU负责人)</option>
+                            <option value="Labeller" {% if user.role == 'Labeller' %}selected{% endif %}>Labeller (打标员)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Category权限 (不选表示全部权限)</label>
+                        <div id="category-checkboxes" class="border p-3" style="max-height: 200px; overflow-y: auto;">
+                            {% for category in categories %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="category_arr" value="{{ category }}"
+                                       id="cat_{{ loop.index }}"
+                                       {% if user.category_arr and category in user.category_arr %}checked{% endif %}>
+                                <label class="form-check-label" for="cat_{{ loop.index }}">
+                                    {{ category }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <small class="form-text text-muted">当前: {% if user.category_arr is none %}全部权限{% else %}{{ user.category_arr|join(', ') or '无' }}{% endif %}</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Brand权限 (不选表示全部权限)</label>
+                        <div id="brand-checkboxes" class="border p-3" style="max-height: 200px; overflow-y: auto;">
+                            {% for brand in brands %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="brand_arr" value="{{ brand }}"
+                                       id="brand_{{ loop.index }}"
+                                       {% if user.brand_arr and brand in user.brand_arr %}checked{% endif %}>
+                                <label class="form-check-label" for="brand_{{ loop.index }}">
+                                    {{ brand }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <small class="form-text text-muted">当前: {% if user.brand_arr is none %}全部权限{% else %}{{ user.brand_arr|join(', ') or '无' }}{% endif %}</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> 保存修改
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h5><i class="fas fa-info-circle"></i> 权限说明</h5>
+                <ul class="small">
+                    <li><strong>不勾选</strong>任何Category/Brand = 该用户有全部权限(NULL)</li>
+                    <li><strong>勾选部分</strong> = 该用户只能访问勾选的项目</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const categoryCheckboxes = document.getElementById('category-checkboxes');
+    const brandCheckboxesContainer = document.getElementById('brand-checkboxes');
+    const allBrands = JSON.parse('{{ brands | tojson | safe }}');
+    const userBrands = JSON.parse('{{ user.brand_arr | tojson | safe }}') || [];
+
+    function getSelectedCategories() {
+        return Array.from(categoryCheckboxes.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+    }
+
+    function updateBrandOptions() {
+        const selectedCategories = getSelectedCategories();
+        const selectedBrands = Array.from(brandCheckboxesContainer.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+
+        if (selectedCategories.length === 0) {
+            renderBrands(allBrands, selectedBrands);
+            return;
+        }
+
+        const params = new URLSearchParams();
+        selectedCategories.forEach(cat => params.append('category', cat));
+
+        fetch(`{{ url_for('admin.brands_for_category') }}?${params.toString()}`)
+            .then(response => response.json())
+            .then(data => {
+                renderBrands(data, selectedBrands);
+            });
+    }
+
+    function renderBrands(brands, selectedBrands) {
+        brandCheckboxesContainer.innerHTML = '';
+        if (brands.length === 0) {
+            brandCheckboxesContainer.innerHTML = '<p class="text-muted">没有可用的Brand</p>';
+            return;
+        }
+        brands.forEach((brand, index) => {
+            const isChecked = selectedBrands.includes(brand) || userBrands.includes(brand);
+            const div = document.createElement('div');
+            div.className = 'form-check';
+            div.innerHTML = `
+                <input class="form-check-input" type="checkbox" name="brand_arr" value="${brand}" id="brand_${index}" ${isChecked ? 'checked' : ''}>
+                <label class="form-check-label" for="brand_${index}">${brand}</label>
+            `;
+            brandCheckboxesContainer.appendChild(div);
+        });
+    }
+
+    categoryCheckboxes.addEventListener('change', updateBrandOptions);
+
+    // Initial load
+    updateBrandOptions();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}上传数据{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-upload"></i> 上传CSV/Excel数据</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                    <div class="mb-3">
+                        <label for="file" class="form-label">选择文件</label>
+                        <input class="form-control" type="file" id="file" name="file" accept=".csv,.xlsx" required>
+                        <div class="form-text">支持CSV和XLSX格式,最大500MB</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="uploadBtn">
+                        <i class="fas fa-upload"></i> 上传并导入
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-light">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-info-circle"></i> 使用说明</h5>
+                <ul class="small">
+                    <li>文件必须包含与Sample.csv相同的表头</li>
+                    <li>上传后数据将直接导入数据库</li>
+                    <li>导入过程中请勿关闭页面</li>
+                    <li>重复上传会追加数据,不会覆盖</li>
+                    <li>建议上传前备份数据库</li>
+                </ul>
+                <hr>
+                <h6><i class="fas fa-chart-line"></i> 性能参考</h6>
+                <ul class="small">
+                    <li>500条: 约5-10秒</li>
+                    <li>1万条: 约10-20秒</li>
+                    <li>10万条: 约1-2分钟</li>
+                    <li>100万条: 约10-20分钟</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 文件上传提示
+document.getElementById('uploadForm').addEventListener('submit', function(e) {
+    const fileInput = document.getElementById('file');
+    const file = fileInput.files[0];
+
+    if (file) {
+        const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
+        if (fileSizeMB > 500) {
+            alert('文件大小超过500MB限制');
+            e.preventDefault();
+            return;
+        }
+
+        // 显示上传提示
+        if (fileSizeMB > 10) {
+            if (!confirm(`文件大小为 ${fileSizeMB}MB，导入可能需要较长时间，请勿关闭页面，是否继续？`)) {
+                e.preventDefault();
+                return;
+            }
+        }
+
+        // 禁用上传按钮,防止重复提交
+        const uploadBtn = document.getElementById('uploadBtn');
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 正在导入,请稍候...';
+    }
+});
+</script>
+{% endblock %}

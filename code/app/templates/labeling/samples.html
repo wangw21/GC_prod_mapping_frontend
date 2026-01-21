@@ -1,0 +1,857 @@
+{% extends "base.html" %}
+
+{% block title %}样本列表{% endblock %}
+
+{# 宏：构建包含所有筛选条件的URL #}
+{% macro build_filter_url(page_num) -%}
+{{ url_for('labeling.samples') }}?page={{ page_num }}{%- if keyword -%}&keyword={{ keyword|urlencode }}{%- endif -%}
+{%- for s in status_filter -%}&status={{ s|urlencode }}{%- endfor -%}
+{%- for e in eretailer_filter -%}&eretailer={{ e|urlencode }}{%- endfor -%}
+{%- for o in online_store_filter -%}&online_store={{ o|urlencode }}{%- endfor -%}
+{%- for b in brand_filter -%}&brand={{ b|urlencode }}{%- endfor -%}
+{%- for n in note_filter -%}&note={{ n|urlencode }}{%- endfor -%}
+{%- for i in is_competitor_filter -%}&is_competitor={{ i|urlencode }}{%- endfor -%}
+{%- for t in total_comments_filter -%}&total_comments={{ t|urlencode }}{%- endfor -%}
+{%- for l in last_total_comments_filter -%}&last_total_comments={{ l|urlencode }}{%- endfor -%}
+{%- for a1 in attr1_filter -%}&attr1={{ a1|urlencode }}{%- endfor -%}
+{%- for a2 in attr2_filter -%}&attr2={{ a2|urlencode }}{%- endfor -%}
+{%- for a3 in attr3_filter -%}&attr3={{ a3|urlencode }}{%- endfor -%}
+{%- for a4 in attr4_filter -%}&attr4={{ a4|urlencode }}{%- endfor -%}
+{%- for a5 in attr5_filter -%}&attr5={{ a5|urlencode }}{%- endfor -%}
+{%- if start_date -%}&start_date={{ start_date }}{%- endif -%}
+{%- if end_date -%}&end_date={{ end_date }}{%- endif -%}
+{%- endmacro %}
+
+{% block content %}
+<style>
+/* 属性输入框样式优化 */
+.attr-input {
+    min-width: 80px;
+}
+
+.attr-input.is-valid {
+    border-color: #28a745;
+    padding-right: calc(1.5em + .75rem);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%2328a745' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right calc(.375em + .1875rem) center;
+    background-size: calc(.75em + .375rem) calc(.75em + .375rem);
+}
+
+.attr-input.is-invalid {
+    border-color: #dc3545;
+    padding-right: calc(1.5em + .75rem);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right calc(.375em + .1875rem) center;
+    background-size: calc(.75em + .375rem) calc(.75em + .375rem);
+}
+
+.add-custom-label-btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.add-custom-label-btn:hover {
+    background-color: #f8f9fa;
+}
+</style>
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-list"></i> 样本列表</h1>
+</div>
+
+<!-- 搜索和筛选 -->
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="GET" class="row g-2">
+            <!-- 关键词搜索 -->
+            <div class="col-md-3">
+                <label class="form-label small">关键词搜索</label>
+                <input type="text" class="form-control form-control-sm" name="keyword" placeholder="产品描述/品牌/类别" value="{{ keyword }}">
+            </div>
+
+            <!-- eRetailer -->
+            <div class="col-md-2">
+                <label class="form-label small">eRetailer</label>
+                <select class="form-select form-select-sm multiselect-filter" name="eretailer" multiple>
+                    {% for option in eretailer_options %}
+                    <option value="{{ option }}" {% if option in eretailer_filter %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- online_store -->
+            <div class="col-md-2">
+                <label class="form-label small">Online Store</label>
+                <select class="form-select form-select-sm multiselect-filter" name="online_store" multiple>
+                    {% for option in online_store_options %}
+                    <option value="{{ option }}" {% if option in online_store_filter %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- brand -->
+            <div class="col-md-2">
+                <label class="form-label small">Brand</label>
+                <select class="form-select form-select-sm multiselect-filter" name="brand" multiple>
+                    {% for option in brand_options %}
+                    <option value="{{ option }}" {% if option in brand_filter %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- is_competitor -->
+            <div class="col-md-2">
+                <label class="form-label small">Is Competitor</label>
+                <select class="form-select form-select-sm multiselect-filter" name="is_competitor" multiple>
+                    {% for option in is_competitor_options %}
+                    <option value="{{ option }}" {% if option in is_competitor_filter %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- note -->
+            <div class="col-md-1">
+                <label class="form-label small">Note</label>
+                <select class="form-select form-select-sm multiselect-filter" name="note" multiple>
+                    {% for option in note_options %}
+                    <option value="{{ option }}" {% if option in note_filter %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- 状态 -->
+            <div class="col-md-1">
+                <label class="form-label small">状态</label>
+                <select class="form-select form-select-sm multiselect-filter" name="status" multiple>
+                    <option value="Unlabeled" {% if 'Unlabeled' in status_filter %}selected{% endif %}>Unlabeled</option>
+                    <option value="Labeled" {% if 'Labeled' in status_filter %}selected{% endif %}>Labeled</option>
+                    <option value="Prelabeled" {% if 'Prelabeled' in status_filter %}selected{% endif %}>Prelabeled</option>
+                    <option value="Historical" {% if 'Historical' in status_filter %}selected{% endif %}>Historical</option>
+                    <option value="Incomplete" {% if 'Incomplete' in status_filter %}selected{% endif %}>Incomplete</option>
+                </select>
+            </div>
+
+            <!-- 第二行 -->
+            <!-- Review Date Range -->
+            <div class="col-md-4">
+                <label class="form-label small">Review Date Range</label>
+                <div class="input-group input-group-sm">
+                    <input type="date" class="form-control" name="start_date" value="{{ start_date or '' }}">
+                    <span class="input-group-text">-</span>
+                    <input type="date" class="form-control" name="end_date" value="{{ end_date or '' }}">
+                </div>
+            </div>
+
+            <!-- total_comments -->
+            <div class="col-md-2">
+                <label class="form-label small">Total Comments</label>
+                <select class="form-select form-select-sm multiselect-filter" name="total_comments" multiple>
+                    {% for option in total_comments_options %}
+                    <option value="{{ option }}" {% if option in total_comments_filter %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- last_total_comments -->
+            <div class="col-md-2">
+                <label class="form-label small">Last Total Comments</label>
+                <select class="form-select form-select-sm multiselect-filter" name="last_total_comments" multiple>
+                    {% for option in last_total_comments_options %}
+                    <option value="{{ option }}" {% if option in last_total_comments_filter %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- 第三行：属性筛选 -->
+            <!-- 属性1 -->
+            <div class="col-md-2">
+                <label class="form-label small">属性1</label>
+                <select class="form-select form-select-sm multiselect-filter" name="attr1" multiple>
+                    {% for option in attr1_options %}
+                    <option value="{{ option }}" {% if option in attr1_filter %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- 属性2 -->
+            <div class="col-md-2">
+                <label class="form-label small">属性2</label>
+                <select class="form-select form-select-sm multiselect-filter" name="attr2" multiple>
+                    {% for option in attr2_options %}
+                    <option value="{{ option }}" {% if option in attr2_filter %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- 属性3 -->
+            <div class="col-md-2">
+                <label class="form-label small">属性3</label>
+                <select class="form-select form-select-sm multiselect-filter" name="attr3" multiple>
+                    {% for option in attr3_options %}
+                    <option value="{{ option }}" {% if option in attr3_filter %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- 属性4 -->
+            <div class="col-md-2">
+                <label class="form-label small">属性4</label>
+                <select class="form-select form-select-sm multiselect-filter" name="attr4" multiple>
+                    {% for option in attr4_options %}
+                    <option value="{{ option }}" {% if option in attr4_filter %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- 属性5 -->
+            <div class="col-md-2">
+                <label class="form-label small">属性5</label>
+                <select class="form-select form-select-sm multiselect-filter" name="attr5" multiple>
+                    {% for option in attr5_options %}
+                    <option value="{{ option }}" {% if option in attr5_filter %}selected{% endif %}>{{ option }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary btn-sm me-2">
+                    <i class="fas fa-search"></i> 筛选
+                </button>
+                <a href="{{ url_for('labeling.samples') }}" class="btn btn-secondary btn-sm">
+                    <i class="fas fa-redo"></i> 重置
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 批量操作 -->
+<div class="card mb-3" id="batchActionsCard" style="display: none;">
+    <div class="card-body d-flex align-items-center">
+        <button id="batchLabelBtn" class="btn btn-primary" disabled>
+            <i class="fas fa-tags"></i> 批量打标
+        </button>
+        <span class="ms-3 text-muted">
+            已选择 <span id="selectedCount" class="badge bg-secondary">0</span> 条记录
+        </span>
+    </div>
+</div>
+
+<!-- 样本表格 -->
+<form id="batchEditForm" method="POST" action="{{ url_for('labeling.batch_save') }}">
+<!-- 隐藏字段: 传递当前页码和筛选条件 -->
+<input type="hidden" name="current_page" value="{{ pagination.page }}">
+<input type="hidden" name="keyword" value="{{ keyword }}">
+{% for s in status_filter %}
+<input type="hidden" name="status" value="{{ s }}">
+{% endfor %}
+{% for e in eretailer_filter %}
+<input type="hidden" name="eretailer" value="{{ e }}">
+{% endfor %}
+{% for o in online_store_filter %}
+<input type="hidden" name="online_store" value="{{ o }}">
+{% endfor %}
+{% for b in brand_filter %}
+<input type="hidden" name="brand" value="{{ b }}">
+{% endfor %}
+{% for n in note_filter %}
+<input type="hidden" name="note" value="{{ n }}">
+{% endfor %}
+{% for i in is_competitor_filter %}
+<input type="hidden" name="is_competitor" value="{{ i }}">
+{% endfor %}
+<input type="hidden" name="start_date" value="{{ start_date or '' }}">
+<input type="hidden" name="end_date" value="{{ end_date or '' }}">
+{% for t in total_comments_filter %}
+<input type="hidden" name="total_comments" value="{{ t }}">
+{% endfor %}
+{% for l in last_total_comments_filter %}
+<input type="hidden" name="last_total_comments" value="{{ l }}">
+{% endfor %}
+{% for a1 in attr1_filter %}
+<input type="hidden" name="attr1" value="{{ a1 }}">
+{% endfor %}
+{% for a2 in attr2_filter %}
+<input type="hidden" name="attr2" value="{{ a2 }}">
+{% endfor %}
+{% for a3 in attr3_filter %}
+<input type="hidden" name="attr3" value="{{ a3 }}">
+{% endfor %}
+{% for a4 in attr4_filter %}
+<input type="hidden" name="attr4" value="{{ a4 }}">
+{% endfor %}
+{% for a5 in attr5_filter %}
+<input type="hidden" name="attr5" value="{{ a5 }}">
+{% endfor %}
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover table-sm table-bordered">
+        <thead class="table-dark">
+            <tr>
+                <th style="width: 30px;"><input class="form-check-input" type="checkbox" id="selectAllCheckbox"></th>
+                <th style="width: 40px;">ID</th>
+                <th style="width: 80px;">品牌</th>
+                <th style="width: 300px;">产品描述</th>
+                <th style="width: 200px;">SKU</th>
+                <th style="width: 50px;">链接</th>
+                <th style="width: 50px;">评论</th>
+                <th style="width: 90px;">Note</th>
+                <th style="width: 120px;">属性1</th>
+                <th style="width: 120px;">属性2</th>
+                <th style="width: 120px;">属性3</th>
+                <th style="width: 120px;">属性4</th>
+                <th style="width: 120px;">属性5</th>
+                <th style="width: 70px;">状态</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sample in samples %}
+            <tr>
+                <td><input class="form-check-input sample-checkbox" type="checkbox" value="{{ sample.id }}"></td>
+                <td>{{ sample.id }}</td>
+                <td>{{ sample.brand }}</td>
+                <td>
+                    <div style="max-width: 300px; word-wrap: break-word; white-space: normal;">
+                        {{ sample.product_description }}
+                    </div>
+                </td>
+                <td>
+                    <div style="max-width: 200px; word-wrap: break-word; white-space: normal;">
+                        {{ sample.sku or '-' }}
+                    </div>
+                </td>
+                <td>
+                    {% if sample.sku_url %}
+                    <a href="{{ sample.sku_url }}" target="_blank" class="btn btn-sm btn-link" title="SKU链接">
+                        <i class="fas fa-external-link-alt"></i>
+                    </a>
+                    {% elif sample.url %}
+                    <a href="{{ sample.url }}" target="_blank" class="btn btn-sm btn-link" title="产品链接">
+                        <i class="fas fa-external-link-alt"></i>
+                    </a>
+                    {% else %}
+                    -
+                    {% endif %}
+                </td>
+                <td>{{ sample.total_comments or '-' }}</td>
+
+                <!-- Note (只读显示) -->
+                <td>{{ sample.note or '-' }}</td>
+
+                <!-- 可编辑的属性字段 -->
+                <td>
+                    <input type="hidden" name="sample_ids[]" value="{{ sample.id }}">
+                    <input type="hidden" name="status_{{ sample.id }}" value="{{ sample.status or '' }}">
+                    <input type="hidden" name="orig_attr1_{{ sample.id }}" value="{{ sample.prod_attributes1 or '' }}">
+                    <input type="hidden" name="orig_attr2_{{ sample.id }}" value="{{ sample.prod_attributes2 or '' }}">
+                    <input type="hidden" name="orig_attr3_{{ sample.id }}" value="{{ sample.prod_attributes3 or '' }}">
+                    <input type="hidden" name="orig_attr4_{{ sample.id }}" value="{{ sample.prod_attributes4 or '' }}">
+                    <input type="hidden" name="orig_attr5_{{ sample.id }}" value="{{ sample.prod_attributes5 or '' }}">
+                    <div class="input-group input-group-sm">
+                        <input type="text" 
+                               class="form-control form-control-sm attr-input" 
+                               name="attr1_{{ sample.id }}" 
+                               data-attr="1"
+                               data-sample-id="{{ sample.id }}"
+                               value="{{ sample.prod_attributes1 or '' }}"
+                               list="attr1_datalist"
+                               placeholder="输入或选择"
+                               autocomplete="off">
+                        <button class="btn btn-outline-secondary btn-sm add-custom-label-btn" 
+                                type="button" 
+                                data-attr="1"
+                                data-sample-id="{{ sample.id }}"
+                                title="新建标签">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-group input-group-sm">
+                        <input type="text" 
+                               class="form-control form-control-sm attr-input" 
+                               name="attr2_{{ sample.id }}" 
+                               data-attr="2"
+                               data-sample-id="{{ sample.id }}"
+                               value="{{ sample.prod_attributes2 or '' }}"
+                               list="attr2_datalist"
+                               placeholder="输入或选择"
+                               autocomplete="off">
+                        <button class="btn btn-outline-secondary btn-sm add-custom-label-btn" 
+                                type="button" 
+                                data-attr="2"
+                                data-sample-id="{{ sample.id }}"
+                                title="新建标签">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-group input-group-sm">
+                        <input type="text" 
+                               class="form-control form-control-sm attr-input" 
+                               name="attr3_{{ sample.id }}" 
+                               data-attr="3"
+                               data-sample-id="{{ sample.id }}"
+                               value="{{ sample.prod_attributes3 or '' }}"
+                               list="attr3_datalist"
+                               placeholder="输入或选择"
+                               autocomplete="off">
+                        <button class="btn btn-outline-secondary btn-sm add-custom-label-btn" 
+                                type="button" 
+                                data-attr="3"
+                                data-sample-id="{{ sample.id }}"
+                                title="新建标签">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-group input-group-sm">
+                        <input type="text" 
+                               class="form-control form-control-sm attr-input" 
+                               name="attr4_{{ sample.id }}" 
+                               data-attr="4"
+                               data-sample-id="{{ sample.id }}"
+                               value="{{ sample.prod_attributes4 or '' }}"
+                               list="attr4_datalist"
+                               placeholder="输入或选择"
+                               autocomplete="off">
+                        <button class="btn btn-outline-secondary btn-sm add-custom-label-btn" 
+                                type="button" 
+                                data-attr="4"
+                                data-sample-id="{{ sample.id }}"
+                                title="新建标签">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-group input-group-sm">
+                        <input type="text" 
+                               class="form-control form-control-sm attr-input" 
+                               name="attr5_{{ sample.id }}" 
+                               data-attr="5"
+                               data-sample-id="{{ sample.id }}"
+                               value="{{ sample.prod_attributes5 or '' }}"
+                               list="attr5_datalist"
+                               placeholder="输入或选择"
+                               autocomplete="off">
+                        <button class="btn btn-outline-secondary btn-sm add-custom-label-btn" 
+                                type="button" 
+                                data-attr="5"
+                                data-sample-id="{{ sample.id }}"
+                                title="新建标签">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </td>
+
+                <td>
+                    {% if sample.status == 'Labeled' %}
+                        <span class="badge bg-success">Labeled</span>
+                    {% elif sample.status == 'Historical' %}
+                        <span class="badge bg-info">Historical</span>
+                    {% elif sample.status == 'Incomplete' %}
+                        <span class="badge bg-secondary">Incomplete</span>
+                    {% elif sample.status == 'Prelabeled' %}
+                        <span class="badge bg-primary">Prelabeled</span>
+                        <div class="form-check mt-1">
+                            <input class="form-check-input prelabel-accept" type="checkbox" 
+                                   name="accept_{{ sample.id }}" id="accept_{{ sample.id }}" value="1">
+                            <label class="form-check-label small" for="accept_{{ sample.id }}">接受</label>
+                        </div>
+                    {% else %}
+                        <span class="badge bg-warning">Unlabeled</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="14" class="text-center text-muted">暂无数据</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Datalist for autocomplete -->
+<datalist id="attr1_datalist">
+    {% for option in attr1_options %}
+    <option value="{{ option }}">
+    {% endfor %}
+</datalist>
+<datalist id="attr2_datalist">
+    {% for option in attr2_options %}
+    <option value="{{ option }}">
+    {% endfor %}
+</datalist>
+<datalist id="attr3_datalist">
+    {% for option in attr3_options %}
+    <option value="{{ option }}">
+    {% endfor %}
+</datalist>
+<datalist id="attr4_datalist">
+    {% for option in attr4_options %}
+    <option value="{{ option }}">
+    {% endfor %}
+</datalist>
+<datalist id="attr5_datalist">
+    {% for option in attr5_options %}
+    <option value="{{ option }}">
+    {% endfor %}
+</datalist>
+
+<!-- 自定义标签模态框 -->
+<div class="modal fade" id="customLabelModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">添加自定义标签</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">属性 <span id="customLabelAttrNum"></span></label>
+                    <input type="text" class="form-control" id="customLabelInput" placeholder="输入新标签">
+                </div>
+                <div class="alert alert-warning small mb-0">
+                    <i class="fas fa-exclamation-triangle"></i> 请确认新标签不存在于现有选项中，避免重复或拼写错误。
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="confirmCustomLabel">确认添加</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 底部提交按钮 -->
+{% if samples %}
+<div class="card mt-3 mb-3">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-8">
+                <button type="submit" class="btn btn-success btn-lg">
+                    <i class="fas fa-save"></i> 保存当前页修改
+                </button>
+                <button type="button" class="btn btn-secondary btn-lg ms-2" onclick="location.reload()">
+                    <i class="fas fa-undo"></i> 取消重置
+                </button>
+            </div>
+            <div class="col-md-4 text-end">
+                <small class="text-muted">
+                    提示: 修改过的数据将变为LABELED；<br>
+                    Prelabeled需勾选"接受"才会变为LABELED；<br>
+                    Historical未修改则保持不变。
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+</form>
+
+<!-- 分页 -->
+{% if pagination.pages > 1 %}
+<nav>
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+            <a class="page-link" href="{{ build_filter_url(pagination.prev_num) }}">上一页</a>
+        </li>
+
+        {% for page_num in pagination.iter_pages(left_edge=2, right_edge=2, left_current=2, right_current=2) %}
+            {% if page_num %}
+                <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
+                    <a class="page-link" href="{{ build_filter_url(page_num) }}">{{ page_num }}</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">...</span></li>
+            {% endif %}
+        {% endfor %}
+
+        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+            <a class="page-link" href="{{ build_filter_url(pagination.next_num) }}">下一页</a>
+        </li>
+    </ul>
+</nav>
+<p class="text-center text-muted">共 {{ pagination.total }} 条数据，当前第 {{ pagination.page }}/{{ pagination.pages }} 页</p>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$(document).ready(function() {
+    // 初始化multiselect插件
+    $('.multiselect-filter').multiselect({
+        buttonWidth: '100%',
+        enableFiltering: true,
+        enableCaseInsensitiveFiltering: true,
+        filterPlaceholder: '搜索...',
+        nonSelectedText: '请选择',
+        nSelectedText: '个已选择',
+        allSelectedText: '全选',
+        maxHeight: 200,
+        buttonClass: 'form-select form-select-sm d-flex align-items-center',
+        templates: {
+            button: '<button type="button" class="multiselect dropdown-toggle" data-bs-toggle="dropdown"><span class="multiselect-selected-text"></span></button>',
+        }
+    });
+    
+    // 刷新multiselect以确保选中状态正确显示
+    $('.multiselect-filter').multiselect('refresh');
+});
+
+// 属性标签验证和自定义标签逻辑
+let currentInputElement = null;
+let currentAttrNum = null;
+
+// 获取所有属性选项数据
+const attrOptions = {
+    1: {{ attr1_options|tojson }},
+    2: {{ attr2_options|tojson }},
+    3: {{ attr3_options|tojson }},
+    4: {{ attr4_options|tojson }},
+    5: {{ attr5_options|tojson }}
+};
+
+// 验证输入值是否在选项列表中
+function isValidOption(attrNum, value) {
+    if (!value || value.trim() === '') return true; // 空值允许
+    return attrOptions[attrNum].includes(value.trim());
+}
+
+// 为输入框添加视觉反馈
+function updateInputValidation(input) {
+    const attrNum = input.dataset.attr;
+    const sampleId = input.dataset.sampleId;
+    const value = input.value.trim();
+    
+    if (value === '') {
+        input.classList.remove('is-invalid', 'is-valid');
+        return true;
+    }
+    
+    // 获取原始值（从隐藏字段）
+    const origValueInput = document.querySelector(`input[name="orig_attr${attrNum}_${sampleId}"]`);
+    const origValue = origValueInput ? origValueInput.value.trim() : '';
+    
+    // 如果当前值等于原始值（未修改），则认为有效
+    if (value === origValue) {
+        input.classList.remove('is-invalid', 'is-valid');
+        return true;
+    }
+    
+    if (isValidOption(attrNum, value)) {
+        input.classList.remove('is-invalid');
+        input.classList.add('is-valid');
+        return true;
+    } else {
+        input.classList.remove('is-valid');
+        input.classList.add('is-invalid');
+        return false;
+    }
+}
+
+// 监听所有属性输入框的change和blur事件
+document.querySelectorAll('.attr-input').forEach(function(input) {
+    input.addEventListener('blur', function() {
+        updateInputValidation(this);
+    });
+    
+    input.addEventListener('input', function() {
+        // 实时移除错误提示，但不添加正确提示
+        if (this.classList.contains('is-invalid')) {
+            updateInputValidation(this);
+        }
+    });
+});
+
+// 新建标签按钮点击事件
+document.querySelectorAll('.add-custom-label-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+        const attrNum = this.dataset.attr;
+        const sampleId = this.dataset.sampleId;
+        currentInputElement = document.querySelector(`input[name="attr${attrNum}_${sampleId}"]`);
+        currentAttrNum = attrNum;
+        
+        document.getElementById('customLabelAttrNum').textContent = attrNum;
+        document.getElementById('customLabelInput').value = '';
+        new bootstrap.Modal(document.getElementById('customLabelModal')).show();
+    });
+});
+
+// 确认添加自定义标签
+document.getElementById('confirmCustomLabel').addEventListener('click', function() {
+    const newLabel = document.getElementById('customLabelInput').value.trim();
+    if (!newLabel) {
+        alert('请输入标签内容');
+        return;
+    }
+    
+    // 检查标签是否已存在
+    if (isValidOption(currentAttrNum, newLabel)) {
+        alert('该标签已存在，请直接在输入框中输入选择');
+        return;
+    }
+    
+    if (currentInputElement) {
+        // 设置输入框的值
+        currentInputElement.value = newLabel;
+        
+        // 添加到选项列表和datalist
+        attrOptions[currentAttrNum].push(newLabel);
+        const datalist = document.getElementById(`attr${currentAttrNum}_datalist`);
+        const option = document.createElement('option');
+        option.value = newLabel;
+        datalist.appendChild(option);
+        
+        // 标记为有效
+        currentInputElement.classList.remove('is-invalid');
+        currentInputElement.classList.add('is-valid');
+    }
+    
+    bootstrap.Modal.getInstance(document.getElementById('customLabelModal')).hide();
+});
+
+// 模态框关闭时清理
+document.getElementById('customLabelModal').addEventListener('hidden.bs.modal', function() {
+    currentInputElement = null;
+    currentAttrNum = null;
+});
+
+// 表单提交验证和确认
+document.getElementById('batchEditForm').addEventListener('submit', function(e) {
+    // 先验证所有属性输入框
+    const attrInputs = document.querySelectorAll('.attr-input');
+    let hasInvalidInput = false;
+    const invalidInputs = [];
+    
+    attrInputs.forEach(function(input) {
+        const isValid = updateInputValidation(input);
+        if (!isValid) {
+            hasInvalidInput = true;
+            invalidInputs.push({
+                attr: input.dataset.attr,
+                value: input.value,
+                sampleId: input.dataset.sampleId
+            });
+        }
+    });
+    
+    if (hasInvalidInput) {
+        e.preventDefault();
+        const invalidCount = invalidInputs.length;
+        const firstInvalid = invalidInputs[0];
+        alert(`发现 ${invalidCount} 个无效的属性值！\n\n例如: 属性${firstInvalid.attr}中的"${firstInvalid.value}"不在已有标签列表中。\n\n请使用"新建标签"按钮添加新标签，或选择已有的标签。`);
+        // 聚焦到第一个无效输入框
+        const firstInvalidInput = document.querySelector(`input[data-sample-id="${firstInvalid.sampleId}"][data-attr="${firstInvalid.attr}"]`);
+        if (firstInvalidInput) {
+            firstInvalidInput.focus();
+            firstInvalidInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        return;
+    }
+    
+    // 验证通过，显示确认对话框
+    const confirmationMessage = "确认保存当前页修改吗？";
+    if (!confirm(confirmationMessage)) {
+        e.preventDefault();
+    }
+});
+
+// 快捷键支持: Enter保存
+document.addEventListener('keydown', function(event) {
+    // 只在非输入框、非textarea、非select元素上监听Enter，或者在属性输入框上按Enter
+    const isAttrInput = event.target.classList.contains('attr-input');
+    const isFormElement = event.target.tagName === 'INPUT' || 
+                         event.target.tagName === 'TEXTAREA' || 
+                         event.target.tagName === 'SELECT';
+    
+    if (event.key === 'Enter') {
+        // 如果是属性输入框按Enter，触发保存
+        if (isAttrInput) {
+            event.preventDefault();
+            const form = document.getElementById('batchEditForm');
+            const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+            form.dispatchEvent(submitEvent);
+            if (!submitEvent.defaultPrevented) {
+                form.submit();
+            }
+        }
+        // 如果是在其他表单元素（搜索框等），让浏览器默认行为处理
+        // 如果不是在任何输入元素上，也不做处理
+    }
+});
+
+// 批量选择逻辑
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+    const sampleCheckboxes = document.querySelectorAll('.sample-checkbox');
+    const batchActionsCard = document.getElementById('batchActionsCard');
+    const batchLabelBtn = document.getElementById('batchLabelBtn');
+    const selectedCountBadge = document.getElementById('selectedCount');
+
+    function updateBatchActions() {
+        const selectedCheckboxes = document.querySelectorAll('.sample-checkbox:checked');
+        const count = selectedCheckboxes.length;
+
+        selectedCountBadge.textContent = count;
+
+        if (count > 0) {
+            batchActionsCard.style.display = 'block';
+            batchLabelBtn.disabled = false;
+        } else {
+            batchActionsCard.style.display = 'none';
+            batchLabelBtn.disabled = true;
+        }
+    }
+
+    // "全选" 复选框逻辑
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            sampleCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+            updateBatchActions();
+        });
+    }
+
+    // 单个复选框逻辑
+    sampleCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            if (!this.checked) {
+                if (selectAllCheckbox) {
+                    selectAllCheckbox.checked = false;
+                }
+            } else {
+                const allChecked = Array.from(sampleCheckboxes).every(c => c.checked);
+                if (allChecked && selectAllCheckbox) {
+                    selectAllCheckbox.checked = true;
+                }
+            }
+            updateBatchActions();
+        });
+    });
+
+    // 批量打标按钮点击事件
+    if (batchLabelBtn) {
+        batchLabelBtn.addEventListener('click', function() {
+            const selectedIds = Array.from(document.querySelectorAll('.sample-checkbox:checked'))
+                                     .map(cb => cb.value)
+                                     .join(',');
+            if (selectedIds) {
+                window.location.href = "{{ url_for('labeling.batch_label') }}?ids=" + selectedIds;
+            }
+        });
+    }
+
+    // 初始化状态
+    updateBatchActions();
+});
+</script>
+{% endblock %}

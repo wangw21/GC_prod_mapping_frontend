@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}下载数据{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-download"></i> 下载数据</h1>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">总数据量</h5>
+                <h2 class="text-primary">{{ total_count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">已打标</h5>
+                <h2 class="text-success">{{ labeled_count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title">未打标</h5>
+                <h2 class="text-warning">{{ unlabeled_count }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <i class="fas fa-file-csv"></i> 导出所有数据
+            </div>
+            <div class="card-body">
+                <p>导出数据库中的所有样本数据(包含已打标和未打标)</p>
+                <form method="POST">
+                    <input type="hidden" name="type" value="all">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-download"></i> 下载全部数据
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <i class="fas fa-file-csv"></i> 导出已打标数据
+            </div>
+            <div class="card-body">
+                <p>导出状态为'Labeled'和'Historical'的数据</p>
+                <form method="POST">
+                    <input type="hidden" name="type" value="labeled">
+                    <button type="submit" class="btn btn-success">
+                        <i class="fas fa-download"></i> 下载已打标数据
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <i class="fas fa-exclamation-triangle"></i> 清除所有样本数据
+            </div>
+            <div class="card-body">
+                <p class="text-danger"><strong>警告:</strong> 此操作将永久删除数据库中所有已导入的样本数据，且无法恢复。请在操作前确认已备份好所有需要的数据。</p>
+                <form method="POST" action="{{ url_for('admin.clear_data') }}" onsubmit="return confirm('【高危操作】您确定要删除所有样本数据吗？此操作无法撤销！');">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash-alt"></i> 我已了解风险，确认清除
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

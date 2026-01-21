@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}数据统计{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-chart-bar"></i> 数据统计</h1>
+</div>
+
+<!-- 总体统计 -->
+<div class="row mb-4">
+    <div class="col-lg-2 col-md-4 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title text-muted">总数据量</h5>
+                <h2 class="text-primary">{{ total_count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title text-muted">Unlabeled</h5>
+                <h2 class="text-warning">{{ unlabeled_count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title text-muted">Labeled</h5>
+                <h2 class="text-success">{{ labeled_count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title text-muted">Prelabeled</h5>
+                <h2 class="text-info">{{ prelabeled_count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title text-muted">Incomplete</h5>
+                <h2 class="text-danger">{{ incomplete_count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-2 col-md-4 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title text-muted">Historical</h5>
+                <h2 class="text-secondary">{{ historical_count }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 按category统计 -->
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <i class="fas fa-chart-pie"></i> 按类别统计
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>类别</th>
+                        <th>总数</th>
+                        <th>Unlabeled</th>
+                        <th>Incomplete</th>
+                        <th>Labeled</th>
+                        <th>Prelabeled</th>
+                        <th>Historical</th>
+                        <th>进度 (Labeled+Historical+Incomplete)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for category, stats in category_stats.items() %}
+                    <tr>
+                        <td><strong>{{ category }}</strong></td>
+                        <td>{{ stats.total }}</td>
+                        <td><span class="text-warning">{{ stats.unlabeled }}</span></td>
+                        <td><span class="text-danger">{{ stats.incomplete }}</span></td>
+                        <td><span class="text-success">{{ stats.labeled }}</span></td>
+                        <td><span class="text-info">{{ stats.prelabeled }}</span></td>
+                        <td><span class="text-secondary">{{ stats.historical }}</span></td>
+                        <td>
+                            <div class="progress" style="height: 25px;">
+                                <div class="progress-bar bg-success" role="progressbar"
+                                     style="width: {{ stats.progress }}%">
+                                    {{ stats.progress }}%
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="mt-3">
+    <a href="{{ url_for('labeling.samples', status=['Unlabeled', 'Prelabeled'], note='New Links') }}" class="btn btn-primary">
+        <i class="fas fa-edit"></i> 开始打标
+    </a>
+</div>
+{% endblock %}

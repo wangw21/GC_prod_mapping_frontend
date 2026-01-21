@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+
+{% block title %}打标 - ID {{ sample.id }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2"><i class="fas fa-edit"></i> 打标 - ID {{ sample.id }}</h1>
+    <a href="{{ url_for('labeling.samples') }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> 返回列表
+    </a>
+</div>
+
+<form method="POST">
+    <div class="row">
+        <!-- 左侧:产品信息 -->
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header bg-info text-white">
+                    <i class="fas fa-info-circle"></i> 产品信息
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm table-bordered">
+                        <tr>
+                            <th style="width: 150px;">品牌 (brand)</th>
+                            <td><strong>{{ sample.brand or '-' }}</strong></td>
+                        </tr>
+                        <tr>
+                            <th>产品描述<br>(product_description)</th>
+                            <td>{{ sample.product_description or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>产品链接 (url)</th>
+                            <td>
+                                {% if sample.sku_url %}
+                                    <a href="{{ sample.sku_url }}" target="_blank" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-external-link-alt"></i> 打开SKU链接
+                                    </a>
+                                    <div class="small text-muted mt-1">{{ sample.sku_url }}</div>
+                                {% elif sample.url %}
+                                    <a href="{{ sample.url }}" target="_blank" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-external-link-alt"></i> 打开产品链接
+                                    </a>
+                                    <div class="small text-muted mt-1">{{ sample.url }}</div>
+                                {% else %}
+                                    <span class="text-muted">无链接</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>SKU</th>
+                            <td>{{ sample.sku or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Note</th>
+                            <td>{{ sample.note or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Total</th>
+                            <td>{{ sample.total or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>评论数<br>(total_comments)</th>
+                            <td>{{ sample.total_comments or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>类别 (category)</th>
+                            <td>{{ sample.category or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>电商平台 (eRetailer)</th>
+                            <td>{{ sample.eRetailer or '-' }}</td>
+                        </tr>
+                        <tr>
+                            <th>在线商店<br>(online_store)</th>
+                            <td>{{ sample.online_store or '-' }}</td>
+                        </tr>
+                        {% if sample.image_url %}
+                        <tr>
+                            <th>产品图片</th>
+                            <td>
+                                <a href="{{ sample.image_url }}" target="_blank" class="btn btn-sm btn-secondary">
+                                    <i class="fas fa-image"></i> 查看图片
+                                </a>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧:打标字段 -->
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <i class="fas fa-tags"></i> 打标字段
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="note" class="form-label fw-bold">Note</label>
+                        <textarea class="form-control" id="note" name="note" rows="3">{{ sample.note or '' }}</textarea>
+                    </div>
+                    <hr>
+                    <div class="mb-3">
+                        <label for="prod_attributes1" class="form-label fw-bold">
+                            prod_attributes1
+                            {% if attr1_options %}
+                            <small class="text-muted">(可选择或输入)</small>
+                            {% endif %}
+                        </label>
+                        <input type="text" class="form-control" id="prod_attributes1" name="prod_attributes1"
+                               value="{{ sample.prod_attributes1 or '' }}"
+                               list="attr1_list"
+                               placeholder="请选择或输入属性值"
+                               autocomplete="off">
+                        {% if attr1_options %}
+                        <datalist id="attr1_list">
+                            {% for option in attr1_options %}
+                            <option value="{{ option }}">
+                            {% endfor %}
+                        </datalist>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="prod_attributes2" class="form-label fw-bold">
+                            prod_attributes2
+                            {% if attr2_options %}
+                            <small class="text-muted">(可选择或输入)</small>
+                            {% endif %}
+                        </label>
+                        <input type="text" class="form-control" id="prod_attributes2" name="prod_attributes2"
+                               value="{{ sample.prod_attributes2 or '' }}"
+                               list="attr2_list"
+                               placeholder="请选择或输入属性值"
+                               autocomplete="off">
+                        {% if attr2_options %}
+                        <datalist id="attr2_list">
+                            {% for option in attr2_options %}
+                            <option value="{{ option }}">
+                            {% endfor %}
+                        </datalist>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="prod_attributes3" class="form-label fw-bold">
+                            prod_attributes3
+                            {% if attr3_options %}
+                            <small class="text-muted">(可选择或输入)</small>
+                            {% endif %}
+                        </label>
+                        <input type="text" class="form-control" id="prod_attributes3" name="prod_attributes3"
+                               value="{{ sample.prod_attributes3 or '' }}"
+                               list="attr3_list"
+                               placeholder="请选择或输入属性值"
+                               autocomplete="off">
+                        {% if attr3_options %}
+                        <datalist id="attr3_list">
+                            {% for option in attr3_options %}
+                            <option value="{{ option }}">
+                            {% endfor %}
+                        </datalist>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="prod_attributes4" class="form-label fw-bold">
+                            prod_attributes4
+                            {% if attr4_options %}
+                            <small class="text-muted">(可选择或输入)</small>
+                            {% endif %}
+                        </label>
+                        <input type="text" class="form-control" id="prod_attributes4" name="prod_attributes4"
+                               value="{{ sample.prod_attributes4 or '' }}"
+                               list="attr4_list"
+                               placeholder="请选择或输入属性值"
+                               autocomplete="off">
+                        {% if attr4_options %}
+                        <datalist id="attr4_list">
+                            {% for option in attr4_options %}
+                            <option value="{{ option }}">
+                            {% endfor %}
+                        </datalist>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="prod_attributes5" class="form-label fw-bold">
+                            prod_attributes5
+                            {% if attr5_options %}
+                            <small class="text-muted">(可选择或输入)</small>
+                            {% endif %}
+                        </label>
+                        <input type="text" class="form-control" id="prod_attributes5" name="prod_attributes5"
+                               value="{{ sample.prod_attributes5 or '' }}"
+                               list="attr5_list"
+                               placeholder="请选择或输入属性值"
+                               autocomplete="off">
+                        {% if attr5_options %}
+                        <datalist id="attr5_list">
+                            {% for option in attr5_options %}
+                            <option value="{{ option }}">
+                            {% endfor %}
+                        </datalist>
+                        {% endif %}
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        提交后将自动标记为 <strong>LABELED</strong> 状态并跳转到下一条未打标数据
+                    </div>
+
+                    <button type="submit" class="btn btn-success btn-lg w-100">
+                        <i class="fas fa-check"></i> 提交打标
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// 快捷键支持: Ctrl+Enter提交
+document.addEventListener('keydown', function(event) {
+    if (event.ctrlKey && event.key === 'Enter') {
+        document.querySelector('form').submit();
+    }
+});
+</script>
+{% endblock %}

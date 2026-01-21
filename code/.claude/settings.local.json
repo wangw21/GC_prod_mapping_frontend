@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"from app import create_app\")",
+      "Bash(python3 create_admin.py)",
+      "Bash(python3 -c \"import pymysql; print(''pymysql OK'')\")",
+      "Bash(python3 -c \"from app import create_app; app = create_app(); print(''Flask应用创建成功'')\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
