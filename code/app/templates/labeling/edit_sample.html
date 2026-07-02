@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}打标 - ID {{ sample.id }}{% endblock %}
+{% block title %}{{ t('Label') }} - ID {{ sample.id }}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-edit"></i> 打标 - ID {{ sample.id }}</h1>
+    <h1 class="h2"><i class="fas fa-edit"></i> {{ t('Label') }} - ID {{ sample.id }}</h1>
     <a href="{{ url_for('labeling.samples') }}" class="btn btn-secondary">
-        <i class="fas fa-arrow-left"></i> 返回列表
+        <i class="fas fa-arrow-left"></i> {{ t('Back to List') }}
     </a>
 </div>
 
@@ -16,33 +16,33 @@
         <div class="col-md-6">
             <div class="card mb-3">
                 <div class="card-header bg-info text-white">
-                    <i class="fas fa-info-circle"></i> 产品信息
+                    <i class="fas fa-info-circle"></i> {{ t('Product Info') }}
                 </div>
                 <div class="card-body">
                     <table class="table table-sm table-bordered">
                         <tr>
-                            <th style="width: 150px;">品牌 (brand)</th>
+                            <th style="width: 150px;">{{ t('Brand') }} (brand)</th>
                             <td><strong>{{ sample.brand or '-' }}</strong></td>
                         </tr>
                         <tr>
-                            <th>产品描述<br>(product_description)</th>
+                            <th>{{ t('Product Description') }}<br>(product_description)</th>
                             <td>{{ sample.product_description or '-' }}</td>
                         </tr>
                         <tr>
-                            <th>产品链接 (url)</th>
+                            <th>{{ t('Product Link') }} (url)</th>
                             <td>
                                 {% if sample.sku_url %}
                                     <a href="{{ sample.sku_url }}" target="_blank" class="btn btn-sm btn-primary">
-                                        <i class="fas fa-external-link-alt"></i> 打开SKU链接
+                                        <i class="fas fa-external-link-alt"></i> {{ t('Open SKU Link') }}
                                     </a>
                                     <div class="small text-muted mt-1">{{ sample.sku_url }}</div>
                                 {% elif sample.url %}
                                     <a href="{{ sample.url }}" target="_blank" class="btn btn-sm btn-primary">
-                                        <i class="fas fa-external-link-alt"></i> 打开产品链接
+                                        <i class="fas fa-external-link-alt"></i> {{ t('Open Product Link') }}
                                     </a>
                                     <div class="small text-muted mt-1">{{ sample.url }}</div>
                                 {% else %}
-                                    <span class="text-muted">无链接</span>
+                                    <span class="text-muted">{{ t('No link') }}</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -59,27 +59,27 @@
                             <td>{{ sample.total or '-' }}</td>
                         </tr>
                         <tr>
-                            <th>评论数<br>(total_comments)</th>
+                            <th>{{ t('Comments') }}<br>(total_comments)</th>
                             <td>{{ sample.total_comments or '-' }}</td>
                         </tr>
                         <tr>
-                            <th>类别 (category)</th>
+                            <th>{{ t('Category') }} (category)</th>
                             <td>{{ sample.category or '-' }}</td>
                         </tr>
                         <tr>
-                            <th>电商平台 (eRetailer)</th>
+                            <th>{{ t('eRetailer') }} (eRetailer)</th>
                             <td>{{ sample.eRetailer or '-' }}</td>
                         </tr>
                         <tr>
-                            <th>在线商店<br>(online_store)</th>
+                            <th>{{ t('Online Store') }}<br>(online_store)</th>
                             <td>{{ sample.online_store or '-' }}</td>
                         </tr>
                         {% if sample.image_url %}
                         <tr>
-                            <th>产品图片</th>
+                            <th>{{ t('Product Image') }}</th>
                             <td>
                                 <a href="{{ sample.image_url }}" target="_blank" class="btn btn-sm btn-secondary">
-                                    <i class="fas fa-image"></i> 查看图片
+                                    <i class="fas fa-image"></i> {{ t('View Image') }}
                                 </a>
                             </td>
                         </tr>
@@ -93,7 +93,7 @@
         <div class="col-md-6">
             <div class="card mb-3">
                 <div class="card-header bg-primary text-white">
-                    <i class="fas fa-tags"></i> 打标字段
+                    <i class="fas fa-tags"></i> {{ t('Label Fields') }}
                 </div>
                 <div class="card-body">
                     <div class="mb-3">
@@ -105,114 +105,104 @@
                         <label for="prod_attributes1" class="form-label fw-bold">
                             prod_attributes1
                             {% if attr1_options %}
-                            <small class="text-muted">(可选择或输入)</small>
+                            <small class="text-muted">{{ t('(select or type)') }}</small>
                             {% endif %}
                         </label>
                         <input type="text" class="form-control" id="prod_attributes1" name="prod_attributes1"
                                value="{{ sample.prod_attributes1 or '' }}"
                                list="attr1_list"
-                               placeholder="请选择或输入属性值"
+                               placeholder="{{ t('Select or type attribute value') }}"
                                autocomplete="off">
-                        {% if attr1_options %}
                         <datalist id="attr1_list">
                             {% for option in attr1_options %}
                             <option value="{{ option }}">
                             {% endfor %}
                         </datalist>
-                        {% endif %}
                     </div>
 
                     <div class="mb-3">
                         <label for="prod_attributes2" class="form-label fw-bold">
                             prod_attributes2
                             {% if attr2_options %}
-                            <small class="text-muted">(可选择或输入)</small>
+                            <small class="text-muted">{{ t('(select or type)') }}</small>
                             {% endif %}
                         </label>
                         <input type="text" class="form-control" id="prod_attributes2" name="prod_attributes2"
                                value="{{ sample.prod_attributes2 or '' }}"
                                list="attr2_list"
-                               placeholder="请选择或输入属性值"
+                               placeholder="{{ t('Select or type attribute value') }}"
                                autocomplete="off">
-                        {% if attr2_options %}
                         <datalist id="attr2_list">
                             {% for option in attr2_options %}
                             <option value="{{ option }}">
                             {% endfor %}
                         </datalist>
-                        {% endif %}
                     </div>
 
                     <div class="mb-3">
                         <label for="prod_attributes3" class="form-label fw-bold">
                             prod_attributes3
                             {% if attr3_options %}
-                            <small class="text-muted">(可选择或输入)</small>
+                            <small class="text-muted">{{ t('(select or type)') }}</small>
                             {% endif %}
                         </label>
                         <input type="text" class="form-control" id="prod_attributes3" name="prod_attributes3"
                                value="{{ sample.prod_attributes3 or '' }}"
                                list="attr3_list"
-                               placeholder="请选择或输入属性值"
+                               placeholder="{{ t('Select or type attribute value') }}"
                                autocomplete="off">
-                        {% if attr3_options %}
                         <datalist id="attr3_list">
                             {% for option in attr3_options %}
                             <option value="{{ option }}">
                             {% endfor %}
                         </datalist>
-                        {% endif %}
                     </div>
 
                     <div class="mb-3">
                         <label for="prod_attributes4" class="form-label fw-bold">
                             prod_attributes4
                             {% if attr4_options %}
-                            <small class="text-muted">(可选择或输入)</small>
+                            <small class="text-muted">{{ t('(select or type)') }}</small>
                             {% endif %}
                         </label>
                         <input type="text" class="form-control" id="prod_attributes4" name="prod_attributes4"
                                value="{{ sample.prod_attributes4 or '' }}"
                                list="attr4_list"
-                               placeholder="请选择或输入属性值"
+                               placeholder="{{ t('Select or type attribute value') }}"
                                autocomplete="off">
-                        {% if attr4_options %}
                         <datalist id="attr4_list">
                             {% for option in attr4_options %}
                             <option value="{{ option }}">
                             {% endfor %}
                         </datalist>
-                        {% endif %}
                     </div>
 
                     <div class="mb-3">
                         <label for="prod_attributes5" class="form-label fw-bold">
                             prod_attributes5
                             {% if attr5_options %}
-                            <small class="text-muted">(可选择或输入)</small>
+                            <small class="text-muted">{{ t('(select or type)') }}</small>
                             {% endif %}
                         </label>
                         <input type="text" class="form-control" id="prod_attributes5" name="prod_attributes5"
                                value="{{ sample.prod_attributes5 or '' }}"
                                list="attr5_list"
-                               placeholder="请选择或输入属性值"
+                               placeholder="{{ t('Select or type attribute value') }}"
                                autocomplete="off">
-                        {% if attr5_options %}
                         <datalist id="attr5_list">
                             {% for option in attr5_options %}
                             <option value="{{ option }}">
                             {% endfor %}
                         </datalist>
-                        {% endif %}
                     </div>
 
                     <div class="alert alert-warning">
                         <i class="fas fa-exclamation-triangle"></i>
-                        提交后将自动标记为 <strong>LABELED</strong> 状态并跳转到下一条未打标数据
+                        {{ t('After submitting, it will be marked as LABELED and jump to the next unlabeled record') }}
                     </div>
 
                     <button type="submit" class="btn btn-success btn-lg w-100">
-                        <i class="fas fa-check"></i> 提交打标
+                        <i class="fas fa-check"></i> {{ t('Submit Label') }}
                     </button>
                 </div>
             </div>
@@ -229,5 +219,35 @@ document.addEventListener('keydown', function(event) {
         document.querySelector('form').submit();
     }
 });
+
+// 属性候选标签层级联动：填写任一 Attribute 缩小其它 Attribute 候选（仅受 Brand + Attr1-5 影响）
+(function() {
+    const brand = {{ (sample.brand or '')|tojson }};
+    let req = null;
+    function refreshOptions() {
+        const params = { brand: brand ? [brand] : [] };
+        for (let n = 1; n <= 5; n++) {
+            const v = (document.getElementById('prod_attributes' + n).value || '').trim();
+            params['attr' + n] = v ? [v] : [];
+        }
+        const qs = $.param(params, true);
+        if (req) { req.abort(); }
+        req = $.getJSON("{{ url_for('labeling.label_options') }}", qs, function(opts) {
+            for (let n = 1; n <= 5; n++) {
+                const dl = document.getElementById('attr' + n + '_list');
+                if (!dl) continue;
+                dl.innerHTML = '';
+                (opts['attr' + n] || []).forEach(function(v) {
+                    const o = document.createElement('option');
+                    o.value = v;
+                    dl.appendChild(o);
+                });
+            }
+        });
+    }
+    for (let n = 1; n <= 5; n++) {
+        document.getElementById('prod_attributes' + n).addEventListener('change', refreshOptions);
+    }
+})();
 </script>
 {% endblock %}

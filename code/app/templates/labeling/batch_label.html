@@ -1,19 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}批量打标{% endblock %}
+{% block title %}{{ t('Batch Labeling') }}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-tags"></i> 批量打标 ({{ samples|length }} 条记录)</h1>
-    <a href="{{ url_for('labeling.samples') }}" class="btn btn-secondary">
-        <i class="fas fa-arrow-left"></i> 返回列表
+    <h1 class="h2"><i class="fas fa-tags"></i> {{ t('Batch Labeling') }} ({{ samples|length }} {{ t('records') }})</h1>
+    <a href="{{ url_for('labeling.samples', **saved_filters) }}" class="btn btn-secondary">
+        <i class="fas fa-arrow-left"></i> {{ t('Back to List') }}
     </a>
 </div>
 
 <!-- 选中的样本列表 -->
 <div class="card mb-3">
     <div class="card-header bg-info text-white">
-        <i class="fas fa-list"></i> 选中的样本
+        <i class="fas fa-list"></i> {{ t('Selected Samples') }}
     </div>
     <div class="card-body">
         <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
@@ -21,8 +21,8 @@
                 <thead class="table-light sticky-top">
                     <tr>
                         <th>ID</th>
-                        <th>品牌</th>
-                        <th>产品描述</th>
+                        <th>{{ t('Brand') }}</th>
+                        <th>{{ t('Product Description') }}</th>
                         <th>SKU</th>
                     </tr>
                 </thead>
@@ -49,20 +49,36 @@
 <!-- 批量打标表单 -->
 <div class="card mb-3">
     <div class="card-header bg-primary text-white">
-        <i class="fas fa-edit"></i> 批量设置属性值
+        <i class="fas fa-edit"></i> {{ t('Batch Set Attributes') }}
     </div>
     <div class="card-body">
         <form method="POST">
             <input type="hidden" name="ids" value="{{ ids_str }}">
+            {# 透传筛选条件，提交后返回列表时保留 filter #}
+            {% for key, vals in saved_filters.items() %}
+                {% if vals is string %}
+                <input type="hidden" name="{{ key }}" value="{{ vals }}">
+                {% else %}
+                    {% for v in vals %}
+                    <input type="hidden" name="{{ key }}" value="{{ v }}">
+                    {% endfor %}
+                {% endif %}
+            {% endfor %}
 
             <div class="alert alert-info">
                 <i class="fas fa-info-circle"></i>
-                <strong>提示:</strong>
+                <strong>{{ t('Tip:') }}</strong>
                 <ul class="mb-0">
-                    <li>只有填写的属性字段才会被更新,空字段不会修改</li>
-                    <li>所有选中的样本将被设置为相同的属性值</li>
-                    <li>提交后将自动标记为 <strong>LABELED</strong> 状态</li>
+                    <li>{{ t('Only filled attribute fields will be updated, empty fields stay unchanged') }}</li>
+                    <li>{{ t('All selected samples will be set to the same attribute values') }}</li>
+                    <li>{{ t('After submitting, it will be marked as LABELED') }}</li>
                 </ul>
+            </div>
+
+            <div class="d-flex justify-content-end mb-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="clearAttrsBtn">
+                    <i class="fas fa-eraser"></i> {{ t('Clear Attribute 1-5') }}
+                </button>
             </div>
 
             <div class="row">
@@ -70,109 +86,104 @@
                     <label for="prod_attributes1" class="form-label fw-bold">
                         prod_attributes1
                         {% if attr1_options %}
-                        <small class="text-muted">(可选择或输入)</small>
+                        <small class="text-muted">{{ t('(select or type)') }}</small>
                         {% endif %}
                     </label>
-                    <input type="text" class="form-control" id="prod_attributes1" name="prod_attributes1"
+                    <input type="text" class="form-control attr-batch" id="prod_attributes1" name="prod_attributes1"
+                           value="{{ remembered.attr1 or '' }}"
                            list="attr1_list"
-                           placeholder="留空则不修改此字段"
+                           placeholder="{{ t('Leave blank to keep this field unchanged') }}"
                            autocomplete="off">
-                    {% if attr1_options %}
                     <datalist id="attr1_list">
                         {% for option in attr1_options %}
                         <option value="{{ option }}">
                         {% endfor %}
                     </datalist>
-                    {% endif %}
                 </div>
 
                 <div class="col-md-6 mb-3">
                     <label for="prod_attributes2" class="form-label fw-bold">
                         prod_attributes2
                         {% if attr2_options %}
-                        <small class="text-muted">(可选择或输入)</small>
+                        <small class="text-muted">{{ t('(select or type)') }}</small>
                         {% endif %}
                     </label>
-                    <input type="text" class="form-control" id="prod_attributes2" name="prod_attributes2"
+                    <input type="text" class="form-control attr-batch" id="prod_attributes2" name="prod_attributes2"
+                           value="{{ remembered.attr2 or '' }}"
                            list="attr2_list"
-                           placeholder="留空则不修改此字段"
+                           placeholder="{{ t('Leave blank to keep this field unchanged') }}"
                            autocomplete="off">
-                    {% if attr2_options %}
                     <datalist id="attr2_list">
                         {% for option in attr2_options %}
                         <option value="{{ option }}">
                         {% endfor %}
                     </datalist>
-                    {% endif %}
                 </div>
 
                 <div class="col-md-6 mb-3">
                     <label for="prod_attributes3" class="form-label fw-bold">
                         prod_attributes3
                         {% if attr3_options %}
-                        <small class="text-muted">(可选择或输入)</small>
+                        <small class="text-muted">{{ t('(select or type)') }}</small>
                         {% endif %}
                     </label>
-                    <input type="text" class="form-control" id="prod_attributes3" name="prod_attributes3"
+                    <input type="text" class="form-control attr-batch" id="prod_attributes3" name="prod_attributes3"
+                           value="{{ remembered.attr3 or '' }}"
                            list="attr3_list"
-                           placeholder="留空则不修改此字段"
+                           placeholder="{{ t('Leave blank to keep this field unchanged') }}"
                            autocomplete="off">
-                    {% if attr3_options %}
                     <datalist id="attr3_list">
                         {% for option in attr3_options %}
                         <option value="{{ option }}">
                         {% endfor %}
                     </datalist>
-                    {% endif %}
                 </div>
 
                 <div class="col-md-6 mb-3">
                     <label for="prod_attributes4" class="form-label fw-bold">
                         prod_attributes4
                         {% if attr4_options %}
-                        <small class="text-muted">(可选择或输入)</small>
+                        <small class="text-muted">{{ t('(select or type)') }}</small>
                         {% endif %}
                     </label>
-                    <input type="text" class="form-control" id="prod_attributes4" name="prod_attributes4"
+                    <input type="text" class="form-control attr-batch" id="prod_attributes4" name="prod_attributes4"
+                           value="{{ remembered.attr4 or '' }}"
                            list="attr4_list"
-                           placeholder="留空则不修改此字段"
+                           placeholder="{{ t('Leave blank to keep this field unchanged') }}"
                            autocomplete="off">
-                    {% if attr4_options %}
                     <datalist id="attr4_list">
                         {% for option in attr4_options %}
                         <option value="{{ option }}">
                         {% endfor %}
                     </datalist>
-                    {% endif %}
                 </div>
 
                 <div class="col-md-6 mb-3">
                     <label for="prod_attributes5" class="form-label fw-bold">
                         prod_attributes5
                         {% if attr5_options %}
-                        <small class="text-muted">(可选择或输入)</small>
+                        <small class="text-muted">{{ t('(select or type)') }}</small>
                         {% endif %}
                     </label>
-                    <input type="text" class="form-control" id="prod_attributes5" name="prod_attributes5"
+                    <input type="text" class="form-control attr-batch" id="prod_attributes5" name="prod_attributes5"
+                           value="{{ remembered.attr5 or '' }}"
                            list="attr5_list"
-                           placeholder="留空则不修改此字段"
+                           placeholder="{{ t('Leave blank to keep this field unchanged') }}"
                            autocomplete="off">
-                    {% if attr5_options %}
                     <datalist id="attr5_list">
                         {% for option in attr5_options %}
                         <option value="{{ option }}">
                         {% endfor %}
                     </datalist>
-                    {% endif %}
                 </div>
             </div>
 
             <div class="d-grid gap-2">
                 <button type="submit" class="btn btn-success btn-lg">
-                    <i class="fas fa-check"></i> 确认批量打标 ({{ samples|length }} 条)
+                    <i class="fas fa-check"></i> {{ t('Confirm Batch Label') }} ({{ samples|length }})
                 </button>
-                <a href="{{ url_for('labeling.samples') }}" class="btn btn-secondary">
-                    <i class="fas fa-times"></i> 取消
+                <a href="{{ url_for('labeling.samples', **saved_filters) }}" class="btn btn-secondary">
+                    <i class="fas fa-times"></i> {{ t('Cancel') }}
                 </a>
             </div>
         </form>
@@ -187,6 +198,43 @@ document.addEventListener('keydown', function(event) {
     if (event.ctrlKey && event.key === 'Enter') {
         document.querySelector('form').submit();
     }
+});
+
+// 一键清除 Attribute 1-5
+document.getElementById('clearAttrsBtn').addEventListener('click', function() {
+    for (let n = 1; n <= 5; n++) {
+        document.getElementById('prod_attributes' + n).value = '';
+    }
+    refreshBatchOptions();
+});
+
+// 品牌范围（候选标签仅受 Brand + Attr1-5 影响，与筛选控件一致）
+const brandFilter = {{ saved_filters.get('brand', [])|tojson }};
+
+// 属性层级联动：填写任一 Attribute 缩小其它 Attribute 候选
+let batchReq = null;
+function refreshBatchOptions() {
+    const params = { brand: brandFilter };
+    for (let n = 1; n <= 5; n++) {
+        const v = (document.getElementById('prod_attributes' + n).value || '').trim();
+        params['attr' + n] = v ? [v] : [];
+    }
+    if (batchReq) { batchReq.abort(); }
+    batchReq = $.getJSON("{{ url_for('labeling.label_options') }}", $.param(params, true), function(opts) {
+        for (let n = 1; n <= 5; n++) {
+            const dl = document.getElementById('attr' + n + '_list');
+            if (!dl) continue;
+            dl.innerHTML = '';
+            (opts['attr' + n] || []).forEach(function(v) {
+                const o = document.createElement('option');
+                o.value = v;
+                dl.appendChild(o);
+            });
+        }
+    });
+}
+document.querySelectorAll('.attr-batch').forEach(function(input) {
+    input.addEventListener('change', refreshBatchOptions);
 });
 </script>
 {% endblock %}

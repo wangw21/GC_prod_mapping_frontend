@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 
-{% block title %}数据统计{% endblock %}
+{% block title %}{{ t('Statistics') }}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-chart-bar"></i> 数据统计</h1>
+    <h1 class="h2"><i class="fas fa-chart-bar"></i> {{ t('Statistics') }}</h1>
 </div>
 
 <!-- 总体统计 -->
@@ -12,7 +12,7 @@
     <div class="col-lg-2 col-md-4 mb-3">
         <div class="card text-center h-100">
             <div class="card-body">
-                <h5 class="card-title text-muted">总数据量</h5>
+                <h5 class="card-title text-muted">{{ t('Total Data') }}</h5>
                 <h2 class="text-primary">{{ total_count }}</h2>
             </div>
         </div>
@@ -62,21 +62,21 @@
 <!-- 按category统计 -->
 <div class="card">
     <div class="card-header bg-primary text-white">
-        <i class="fas fa-chart-pie"></i> 按类别统计
+        <i class="fas fa-chart-pie"></i> {{ t('Statistics by Category') }}
     </div>
     <div class="card-body">
         <div class="table-responsive">
             <table class="table table-striped">
                 <thead>
                     <tr>
-                        <th>类别</th>
-                        <th>总数</th>
+                        <th>{{ t('Category') }}</th>
+                        <th>{{ t('Total') }}</th>
                         <th>Unlabeled</th>
                         <th>Incomplete</th>
                         <th>Labeled</th>
                         <th>Prelabeled</th>
                         <th>Historical</th>
-                        <th>进度 (Labeled+Historical+Incomplete)</th>
+                        <th>{{ t('Progress') }} (Labeled+Historical+Incomplete)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -107,7 +107,7 @@
 
 <div class="mt-3">
     <a href="{{ url_for('labeling.samples', status=['Unlabeled', 'Prelabeled'], note='New Links') }}" class="btn btn-primary">
-        <i class="fas fa-edit"></i> 开始打标
+        <i class="fas fa-edit"></i> {{ t('Start Labeling') }}
     </a>
 </div>
 {% endblock %}

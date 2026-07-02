@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime
 import json
 
 db = SQLAlchemy()
@@ -133,3 +134,52 @@ class SampleData(db.Model):
 
     def __repr__(self):
         return f'<SampleData {self.id}>'
+
+
+class AuditLog(db.Model):
+    """操作审计日志：记录用户对数据的更改，支持溯源与找回。
+
+    changes 字段存储字段级 {old, new} 快照，仅当 entity_type='sample' 时用于一键回滚。
+    product_description/sku/url/sku_url 为业务身份四列：数据每月清空重传后自增 id 会变，
+    这四列是与下游数据表联动、跨月定位同一条数据的稳定业务键。
+    """
+    __tablename__ = 'audit_log'
+
+    id = db.Column(db.Integer, primary_key=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    user_id = db.Column(db.Integer, index=True)
+    username = db.Column(db.String(50))            # 冗余存储，避免用户删除后无法溯源
+    action = db.Column(db.String(50), index=True)  # label_edit/batch_label/batch_save/upload/clear_data/user_*
+    entity_type = db.Column(db.String(30), index=True)  # sample/user/data
+    entity_id = db.Column(db.Integer, index=True)  # 当月自增 id（仅供快速查看，跨月不稳定）
+    # 业务身份四列（稳定键，用于下游联动与跨月回滚）
+    product_description = db.Column(db.Text)
+    sku = db.Column(db.Text)
+    url = db.Column(db.Text)
+    sku_url = db.Column(db.Text)
+    changes = db.Column(db.JSON)                    # {field: {old, new}}，用于回滚
+    detail = db.Column(db.Text)                     # 人类可读摘要
+    ip = db.Column(db.String(45))
+    reverted = db.Column(db.Boolean, default=False)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else '',
+            'user_id': self.user_id,
+            'username': self.username,
+            'action': self.action,
+            'entity_type': self.entity_type,
+            'entity_id': self.entity_id,
+            'product_description': self.product_description,
+            'sku': self.sku,
+            'url': self.url,
+            'sku_url': self.sku_url,
+            'changes': self.changes,
+            'detail': self.detail,
+            'ip': self.ip,
+            'reverted': self.reverted,
+        }
+
+    def __repr__(self):
+        return f'<AuditLog {self.id} {self.action} {self.entity_type}:{self.entity_id}>'

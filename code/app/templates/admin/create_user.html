@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}创建用户{% endblock %}
+{% block title %}{{ t('Create User') }}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-user-plus"></i> 创建用户</h1>
+    <h1 class="h2"><i class="fas fa-user-plus"></i> {{ t('Create User') }}</h1>
     <a href="{{ url_for('admin.users') }}" class="btn btn-secondary">
-        <i class="fas fa-arrow-left"></i> 返回
+        <i class="fas fa-arrow-left"></i> {{ t('Return') }}
     </a>
 </div>
 
@@ -16,31 +16,31 @@
             <div class="card-body">
                 <form method="POST">
                     <div class="mb-3">
-                        <label for="username" class="form-label">用户名 <span class="text-danger">*</span></label>
+                        <label for="username" class="form-label">{{ t('Username') }} <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" id="username" name="username" required>
                     </div>
 
                     <div class="mb-3">
-                        <label for="password" class="form-label">密码 <span class="text-danger">*</span></label>
+                        <label for="password" class="form-label">{{ t('Password') }} <span class="text-danger">*</span></label>
                         <input type="password" class="form-control" id="password" name="password" required>
                     </div>
 
                     <div class="mb-3">
-                        <label for="real_name" class="form-label">真实姓名</label>
+                        <label for="real_name" class="form-label">{{ t('Real Name') }}</label>
                         <input type="text" class="form-control" id="real_name" name="real_name">
                     </div>
 
                     <div class="mb-3">
-                        <label for="role" class="form-label">角色 <span class="text-danger">*</span></label>
+                        <label for="role" class="form-label">{{ t('Role') }} <span class="text-danger">*</span></label>
                         <select class="form-select" id="role" name="role" required>
-                            <option value="Data_admin">Data_admin (数据管理员)</option>
-                            <option value="BU_admin">BU_admin (BU负责人)</option>
-                            <option value="Labeller" selected>Labeller (打标员)</option>
+                            <option value="Data_admin">Data_admin</option>
+                            <option value="BU_admin">BU_admin</option>
+                            <option value="Labeller" selected>Labeller</option>
                         </select>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Category权限 (不选表示全部权限)</label>
+                        <label class="form-label">{{ t('Category Permission (none = all)') }}</label>
                         <div id="category-checkboxes" class="border p-3" style="max-height: 200px; overflow-y: auto;">
                             {% for category in categories %}
                             <div class="form-check">
@@ -51,11 +51,11 @@
                             </div>
                             {% endfor %}
                         </div>
-                        <small class="form-text text-muted">不勾选任何项=全部权限(NULL)</small>
+                        <small class="form-text text-muted">{{ t('No checkbox selected = all permission (NULL)') }}</small>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Brand权限 (不选表示全部权限)</label>
+                        <label class="form-label">{{ t('Brand Permission (none = all)') }}</label>
                         <div id="brand-checkboxes" class="border p-3" style="max-height: 200px; overflow-y: auto;">
                             {% for brand in brands %}
                             <div class="form-check">
@@ -66,11 +66,11 @@
                             </div>
                             {% endfor %}
                         </div>
-                        <small class="form-text text-muted">不勾选任何项=全部权限(NULL)</small>
+                        <small class="form-text text-muted">{{ t('No checkbox selected = all permission (NULL)') }}</small>
                     </div>
 
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-save"></i> 创建用户
+                        <i class="fas fa-save"></i> {{ t('Create User') }}
                     </button>
                 </form>
             </div>
@@ -80,13 +80,13 @@
     <div class="col-md-4">
         <div class="card bg-light">
             <div class="card-body">
-                <h5><i class="fas fa-info-circle"></i> 权限说明</h5>
+                <h5><i class="fas fa-info-circle"></i> {{ t('Permission Notes') }}</h5>
                 <ul class="small">
-                    <li><strong>不勾选</strong>任何Category/Brand = 该用户有全部权限(NULL)</li>
-                    <li><strong>勾选部分</strong> = 该用户只能访问勾选的项目</li>
-                    <li>Data_admin通常给全部权限</li>
-                    <li>BU_admin可以限制category</li>
-                    <li>Labeller需要同时限制category和brand</li>
+                    <li><strong>{{ t('Not selecting') }}</strong> {{ t('any Category/Brand = the user has all permission (NULL)') }}</li>
+                    <li><strong>{{ t('Selecting some') }}</strong> = {{ t('the user can only access selected items') }}</li>
+                    <li>{{ t('Data_admin usually has all permission') }}</li>
+                    <li>{{ t('BU_admin can restrict category') }}</li>
+                    <li>{{ t('Labeller needs both category and brand restricted') }}</li>
                 </ul>
             </div>
         </div>
@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function renderBrands(brands, selectedBrands) {
         brandCheckboxesContainer.innerHTML = '';
         if (brands.length === 0) {
-            brandCheckboxesContainer.innerHTML = '<p class="text-muted">没有可用的Brand</p>';
+            brandCheckboxesContainer.innerHTML = '<p class="text-muted">{{ t("No available Brand") }}</p>';
             return;
         }
         brands.forEach((brand, index) => {

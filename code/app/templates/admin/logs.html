@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+
+{% block title %}{{ t('Operation Logs') }}{% endblock %}
+
+{% block content %}
+<style>
+    .rollback-panel .form-label {
+        font-size: 0.78rem;
+        margin-bottom: 0.2rem;
+    }
+    .op-btn {
+        min-width: 28px;
+        height: 28px;
+        padding: 0;
+        line-height: 1;
+    }
+    .op-btn i {
+        font-size: 0.8rem;
+    }
+</style>
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <div>
+        <h1 class="h2 mb-1"><i class="fas fa-history"></i> {{ t('Operation Logs') }}</h1>
+        <div class="small text-muted">{{ t('Operation data total') }}: <strong>{{ total_logs_count }}</strong></div>
+    </div>
+    <div class="d-flex align-items-end gap-2 flex-wrap">
+        <a href="{{ url_for('admin.logs_export') }}" class="btn btn-success">
+            <i class="fas fa-file-export"></i> {{ t('Export Logs') }}
+        </a>
+        <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#clearLogsModal">
+            <i class="fas fa-trash-alt"></i> {{ t('Clear Logs') }}
+        </button>
+    </div>
+</div>
+
+<div class="card mb-3 rollback-panel border-warning-subtle">
+    <div class="card-header py-2 bg-light">
+        <strong class="small"><i class="fas fa-user-clock text-warning"></i> {{ t('Rollback User To Time') }}</strong>
+    </div>
+    <div class="card-body py-2">
+        <div class="small text-muted mb-2">{{ t('Revert all operations for this user after the selected time?') }}</div>
+        <form method="POST" action="{{ url_for('admin.logs_revert_user_before') }}" class="row g-2 align-items-end"
+              onsubmit="return confirm('{{ t('Revert all operations for this user after the selected time?') }}');">
+            <div class="col-lg-4 col-md-5">
+                <label class="form-label">{{ t('User') }}</label>
+                <input type="text" class="form-control form-control-sm" name="username" value="{{ user_filter or '' }}" placeholder="username" required>
+            </div>
+            <div class="col-lg-4 col-md-5">
+                <label class="form-label">{{ t('Rollback To Time') }}</label>
+                <input type="datetime-local" class="form-control form-control-sm" name="before" required>
+            </div>
+            <div class="col-lg-4 col-md-2 d-grid">
+                <button type="submit" class="btn btn-warning btn-sm text-nowrap">
+                    <i class="fas fa-history"></i> {{ t('Rollback User To Time') }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="GET" class="row g-2">
+            <div class="col-md-3">
+                <label class="form-label small">{{ t('Action') }}</label>
+                <select class="form-select form-select-sm" name="action">
+                    <option value="">{{ t('All') }}</option>
+                    {% for a in actions %}
+                    <option value="{{ a }}" {% if a == action_filter %}selected{% endif %}>{{ a }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">{{ t('User') }}</label>
+                <input type="text" class="form-control form-control-sm" name="username" value="{{ user_filter }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">{{ t('Entity ID') }}</label>
+                <input type="text" class="form-control form-control-sm" name="entity_id" value="{{ entity_filter }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">Product Description</label>
+                <input type="text" class="form-control form-control-sm" name="product_description" value="{{ pd_filter }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">SKU</label>
+                <input type="text" class="form-control form-control-sm" name="sku" value="{{ sku_filter }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">URL</label>
+                <input type="text" class="form-control form-control-sm" name="url" value="{{ url_filter }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small">SKU_URL</label>
+                <input type="text" class="form-control form-control-sm" name="sku_url" value="{{ skuurl_filter }}">
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary btn-sm me-2"><i class="fas fa-search"></i> {{ t('Filter') }}</button>
+                <a href="{{ url_for('admin.logs') }}" class="btn btn-secondary btn-sm"><i class="fas fa-redo"></i> {{ t('Reset') }}</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Clear Logs Modal -->
+<div class="modal fade" id="clearLogsModal" tabindex="-1" aria-labelledby="clearLogsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('admin.logs_clear') }}">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="clearLogsModalLabel"><i class="fas fa-trash-alt text-danger"></i> {{ t('Clear Logs') }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label">{{ t('Clear logs before this date') }}</label>
+                    <input type="date" class="form-control" name="before" required>
+                    <div class="alert alert-warning mt-3 mb-0 small">
+                        <i class="fas fa-exclamation-triangle"></i> {{ t('A backup will be downloaded before clearing. Continue?') }}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('Cancel') }}</button>
+                    <button type="submit" class="btn btn-danger"><i class="fas fa-trash-alt"></i> {{ t('Clear Logs') }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-hover table-sm table-bordered">
+        <thead class="table-dark">
+            <tr>
+                <th>{{ t('Time') }}</th>
+                <th>{{ t('User') }}</th>
+                <th>{{ t('Action') }}</th>
+                <th>{{ t('Entity') }}</th>
+                <th>{{ t('Detail') }}</th>
+                <th>{{ t('Changes') }}</th>
+                <th>IP</th>
+                <th>{{ t('Operation') }}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in logs %}
+            <tr>
+                <td>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') if log.created_at else '-' }}</td>
+                <td>{{ log.username or '-' }}</td>
+                <td><span class="badge bg-secondary">{{ log.action }}</span></td>
+                <td>
+                    {{ log.entity_type }}{% if log.entity_id %} #{{ log.entity_id }}{% endif %}
+                    {% if log.sku or log.product_description %}
+                    <div class="text-muted small">
+                        {% if log.sku %}<div>SKU: {{ log.sku }}</div>{% endif %}
+                        {% if log.product_description %}<div title="{{ log.product_description }}">{{ log.product_description[:40] }}{% if log.product_description|length > 40 %}…{% endif %}</div>{% endif %}
+                    </div>
+                    {% endif %}
+                </td>
+                <td><small>{{ log.detail or '-' }}</small></td>
+                <td>
+                    {% if log.changes %}
+                    <small>
+                        {% for field, c in log.changes.items() %}
+                        {% if (c.old or '') == (c.new or '') %}
+                        <div>{{ field }}: {{ c.new or '∅' }}</div>
+                        {% else %}
+                        <div>{{ field }}: <span class="text-danger">{{ c.old or '∅' }}</span> → <span class="text-success">{{ c.new or '∅' }}</span></div>
+                        {% endif %}
+                        {% endfor %}
+                    </small>
+                    {% else %}-{% endif %}
+                </td>
+                <td><small>{{ log.ip or '-' }}</small></td>
+                <td class="text-nowrap">
+                    {% if log.entity_type == 'sample' and log.changes and not log.reverted %}
+                    <form method="POST" action="{{ url_for('admin.logs_revert', log_id=log.id) }}" class="d-inline"
+                          onsubmit="return confirm('{{ t('Revert this single log to previous values?') }}');">
+                        <button type="submit" class="btn btn-sm btn-outline-warning op-btn"
+                                title="{{ t('Revert Single') }}">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                    </form>
+                    {% if log.action in ['batch_label', 'batch_save'] %}
+                    <form method="POST" action="{{ url_for('admin.logs_revert_batch', log_id=log.id) }}" class="d-inline"
+                          onsubmit="return confirm('{{ t('Revert this whole batch?') }}\n{{ t('Batch revert will apply to all logs in the same submission.') }}');">
+                        <button type="submit" class="btn btn-sm btn-danger op-btn"
+                                title="{{ t('Revert Batch') }} - {{ t('Batch revert will apply to all logs in the same submission.') }}">
+                            <i class="fas fa-layer-group"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                    {% elif log.reverted %}
+                    <span class="badge bg-info">{{ t('Reverted') }}</span>
+                    <form method="POST" action="{{ url_for('admin.logs_undo_revert', log_id=log.id) }}" class="d-inline"
+                          onsubmit="return confirm('{{ t('Undo this revert?') }}\n{{ t('If this log belongs to a reverted batch, the whole batch will be undone.') }}');">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary op-btn"
+                                title="{{ t('Undo Revert') }}">
+                            <i class="fas fa-rotate-left"></i>
+                        </button>
+                    </form>
+                    {% else %}-{% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="8" class="text-center text-muted">{{ t('No data') }}</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if pagination.pages > 1 %}
+<nav>
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('admin.logs', page=pagination.prev_num, action=action_filter, username=user_filter, entity_id=entity_filter, product_description=pd_filter, sku=sku_filter, url=url_filter, sku_url=skuurl_filter) }}">{{ t('Previous') }}</a>
+        </li>
+        {% for p in pagination.iter_pages(left_edge=2, right_edge=2, left_current=2, right_current=2) %}
+            {% if p %}
+            <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                <a class="page-link" href="{{ url_for('admin.logs', page=p, action=action_filter, username=user_filter, entity_id=entity_filter, product_description=pd_filter, sku=sku_filter, url=url_filter, sku_url=skuurl_filter) }}">{{ p }}</a>
+            </li>
+            {% else %}
+            <li class="page-item disabled"><span class="page-link">...</span></li>
+            {% endif %}
+        {% endfor %}
+        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('admin.logs', page=pagination.next_num, action=action_filter, username=user_filter, entity_id=entity_filter, product_description=pd_filter, sku=sku_filter, url=url_filter, sku_url=skuurl_filter) }}">{{ t('Next') }}</a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

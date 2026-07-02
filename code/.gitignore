@@ -1,0 +1,14 @@
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual Environment
+venv/
+
+# Runtime data and logs
+nohup.out
+uploads/
+exports/
+*.bak
+Sample.csv

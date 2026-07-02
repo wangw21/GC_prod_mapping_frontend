@@ -1,17 +1,17 @@
 {% extends "base.html" %}
 
-{% block title %}下载数据{% endblock %}
+{% block title %}{{ t('Download Data') }}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-download"></i> 下载数据</h1>
+    <h1 class="h2"><i class="fas fa-download"></i> {{ t('Download Data') }}</h1>
 </div>
 
 <div class="row">
     <div class="col-md-4">
         <div class="card text-center">
             <div class="card-body">
-                <h5 class="card-title">总数据量</h5>
+                <h5 class="card-title">{{ t('Total Data') }}</h5>
                 <h2 class="text-primary">{{ total_count }}</h2>
             </div>
         </div>
@@ -19,7 +19,7 @@
     <div class="col-md-4">
         <div class="card text-center">
             <div class="card-body">
-                <h5 class="card-title">已打标</h5>
+                <h5 class="card-title">{{ t('Labeled count') }}</h5>
                 <h2 class="text-success">{{ labeled_count }}</h2>
             </div>
         </div>
@@ -27,7 +27,7 @@
     <div class="col-md-4">
         <div class="card text-center">
             <div class="card-body">
-                <h5 class="card-title">未打标</h5>
+                <h5 class="card-title">{{ t('Unlabeled count') }}</h5>
                 <h2 class="text-warning">{{ unlabeled_count }}</h2>
             </div>
         </div>
@@ -38,14 +38,14 @@
     <div class="col-md-6">
         <div class="card">
             <div class="card-header bg-primary text-white">
-                <i class="fas fa-file-csv"></i> 导出所有数据
+                <i class="fas fa-file-csv"></i> {{ t('Export all data') }}
             </div>
             <div class="card-body">
-                <p>导出数据库中的所有样本数据(包含已打标和未打标)</p>
+                <p>{{ t('Export all sample data from the database (labeled and unlabeled)') }}</p>
                 <form method="POST">
                     <input type="hidden" name="type" value="all">
                     <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-download"></i> 下载全部数据
+                        <i class="fas fa-download"></i> {{ t('Download All Data') }}
                     </button>
                 </form>
             </div>
@@ -54,14 +54,14 @@
     <div class="col-md-6">
         <div class="card">
             <div class="card-header bg-success text-white">
-                <i class="fas fa-file-csv"></i> 导出已打标数据
+                <i class="fas fa-file-csv"></i> {{ t('Export labeled data') }}
             </div>
             <div class="card-body">
-                <p>导出状态为'Labeled'和'Historical'的数据</p>
+                <p>{{ t("Export data with status 'Labeled' and 'Historical'") }}</p>
                 <form method="POST">
                     <input type="hidden" name="type" value="labeled">
                     <button type="submit" class="btn btn-success">
-                        <i class="fas fa-download"></i> 下载已打标数据
+                        <i class="fas fa-download"></i> {{ t('Download Labeled Data') }}
                     </button>
                 </form>
             </div>
@@ -73,13 +73,13 @@
     <div class="col-md-12">
         <div class="card border-danger">
             <div class="card-header bg-danger text-white">
-                <i class="fas fa-exclamation-triangle"></i> 清除所有样本数据
+                <i class="fas fa-exclamation-triangle"></i> {{ t('Clear All Sample Data') }}
             </div>
             <div class="card-body">
-                <p class="text-danger"><strong>警告:</strong> 此操作将永久删除数据库中所有已导入的样本数据，且无法恢复。请在操作前确认已备份好所有需要的数据。</p>
-                <form method="POST" action="{{ url_for('admin.clear_data') }}" onsubmit="return confirm('【高危操作】您确定要删除所有样本数据吗？此操作无法撤销！');">
+                <p class="text-danger"><strong>{{ t('Warning:') }}</strong> {{ t('This operation will permanently delete all imported sample data and cannot be recovered. Please make sure you have backed up all needed data.') }}</p>
+                <form method="POST" action="{{ url_for('admin.clear_data') }}" onsubmit="return confirm('{{ t("[High-risk] Are you sure you want to delete all sample data? This cannot be undone!") }}');">
                     <button type="submit" class="btn btn-danger">
-                        <i class="fas fa-trash-alt"></i> 我已了解风险，确认清除
+                        <i class="fas fa-trash-alt"></i> {{ t('I understand the risk, confirm clear') }}
                     </button>
                 </form>
             </div>

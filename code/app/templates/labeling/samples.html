@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 
-{% block title %}样本列表{% endblock %}
+{% block title %}{{ t('Sample List') }}{% endblock %}
 
-{# 宏：构建包含所有筛选条件的URL #}
+{# Macro: build URL containing all filter conditions #}
 {% macro build_filter_url(page_num) -%}
 {{ url_for('labeling.samples') }}?page={{ page_num }}{%- if keyword -%}&keyword={{ keyword|urlencode }}{%- endif -%}
 {%- for s in status_filter -%}&status={{ s|urlencode }}{%- endfor -%}
@@ -24,7 +24,7 @@
 
 {% block content %}
 <style>
-/* 属性输入框样式优化 */
+/* Attribute input box style optimization */
 .attr-input {
     min-width: 80px;
 }
@@ -55,25 +55,70 @@
 .add-custom-label-btn:hover {
     background-color: #f8f9fa;
 }
+
+/* 消除多选控件初始化前的原生下拉闪烁：插件就绪前隐藏原生 select */
+.multiselect-filter {
+    display: none;
+}
+
+/* 已点击过的 Link 用不同颜色区分 */
+.sample-link.visited {
+    color: #6f42c1;
+}
+.sample-link.visited:hover {
+    color: #59359a;
+}
 </style>
 
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-list"></i> 样本列表</h1>
+    <h1 class="h2"><i class="fas fa-list"></i> {{ t('Sample List') }}</h1>
 </div>
 
-<!-- 搜索和筛选 -->
+{% if progress_stats and progress_stats.total > 0 %}
+{% set completed = progress_stats.labeled + progress_stats.historical + progress_stats.incomplete %}
+{% set pct_labeled = (progress_stats.labeled / progress_stats.total * 100)|round(1) %}
+{% set pct_historical = (progress_stats.historical / progress_stats.total * 100)|round(1) %}
+{% set pct_incomplete = (progress_stats.incomplete / progress_stats.total * 100)|round(1) %}
+{% set pct_prelabeled = (progress_stats.prelabeled / progress_stats.total * 100)|round(1) %}
+{% set pct_unlabeled = (progress_stats.unlabeled / progress_stats.total * 100)|round(1) %}
+{% set pct_done = (completed / progress_stats.total * 100)|round(1) %}
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="fw-bold"><i class="fas fa-tasks"></i> {{ t('Labeling Progress') }}</span>
+            <span class="small text-muted">{{ completed }} / {{ progress_stats.total }} ({{ pct_done }}%)</span>
+        </div>
+        <div class="progress" style="height: 22px;">
+            <div class="progress-bar bg-danger" role="progressbar" style="width: {{ pct_unlabeled }}%" title="Unlabeled: {{ progress_stats.unlabeled }}">{{ progress_stats.unlabeled }}</div>
+            <div class="progress-bar bg-warning text-dark" role="progressbar" style="width: {{ pct_prelabeled }}%" title="Prelabeled: {{ progress_stats.prelabeled }}">{{ progress_stats.prelabeled }}</div>
+            <div class="progress-bar bg-info" role="progressbar" style="width: {{ pct_incomplete }}%" title="Incomplete: {{ progress_stats.incomplete }}">{{ progress_stats.incomplete }}</div>
+            <div class="progress-bar bg-success" role="progressbar" style="width: {{ pct_labeled }}%" title="Labeled: {{ progress_stats.labeled }}">{{ progress_stats.labeled }}</div>
+            <div class="progress-bar bg-secondary" role="progressbar" style="width: {{ pct_historical }}%" title="Historical: {{ progress_stats.historical }}">{{ progress_stats.historical }}</div>
+        </div>
+        <div class="d-flex flex-wrap gap-3 mt-1 small">
+            <span><span class="badge bg-danger">&nbsp;</span> {{ t('Unlabeled') }} {{ progress_stats.unlabeled }}</span>
+            <span><span class="badge bg-warning">&nbsp;</span> {{ t('Prelabeled') }} {{ progress_stats.prelabeled }}</span>
+            <span><span class="badge bg-info">&nbsp;</span> {{ t('Incomplete') }} {{ progress_stats.incomplete }}</span>
+            <span><span class="badge bg-success">&nbsp;</span> {{ t('Labeled') }} {{ progress_stats.labeled }}</span>
+            <span><span class="badge bg-secondary">&nbsp;</span> {{ t('Historical') }} {{ progress_stats.historical }}</span>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Search and filters -->
 <div class="card mb-3">
     <div class="card-body">
-        <form method="GET" class="row g-2">
-            <!-- 关键词搜索 -->
+        <form method="GET" class="row g-2" id="sampleFilterForm">
+            <!-- Keyword search -->
             <div class="col-md-3">
-                <label class="form-label small">关键词搜索</label>
-                <input type="text" class="form-control form-control-sm" name="keyword" placeholder="产品描述/品牌/类别" value="{{ keyword }}">
+                <label class="form-label small">{{ t('Keyword Search') }}</label>
+                <input type="text" class="form-control form-control-sm" name="keyword" placeholder="{{ t('Product description / brand / category') }}" value="{{ keyword }}">
             </div>
 
             <!-- eRetailer -->
             <div class="col-md-2">
-                <label class="form-label small">eRetailer</label>
+                <label class="form-label small">{{ t('eRetailer') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="eretailer" multiple>
                     {% for option in eretailer_options %}
                     <option value="{{ option }}" {% if option in eretailer_filter %}selected{% endif %}>{{ option }}</option>
@@ -83,7 +128,7 @@
 
             <!-- online_store -->
             <div class="col-md-2">
-                <label class="form-label small">Online Store</label>
+                <label class="form-label small">{{ t('Online Store') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="online_store" multiple>
                     {% for option in online_store_options %}
                     <option value="{{ option }}" {% if option in online_store_filter %}selected{% endif %}>{{ option }}</option>
@@ -93,7 +138,7 @@
 
             <!-- brand -->
             <div class="col-md-2">
-                <label class="form-label small">Brand</label>
+                <label class="form-label small">{{ t('Brand') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="brand" multiple>
                     {% for option in brand_options %}
                     <option value="{{ option }}" {% if option in brand_filter %}selected{% endif %}>{{ option }}</option>
@@ -103,7 +148,7 @@
 
             <!-- is_competitor -->
             <div class="col-md-2">
-                <label class="form-label small">Is Competitor</label>
+                <label class="form-label small">{{ t('Is Competitor') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="is_competitor" multiple>
                     {% for option in is_competitor_options %}
                     <option value="{{ option }}" {% if option in is_competitor_filter %}selected{% endif %}>{{ option }}</option>
@@ -113,7 +158,7 @@
 
             <!-- note -->
             <div class="col-md-1">
-                <label class="form-label small">Note</label>
+                <label class="form-label small">{{ t('Note') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="note" multiple>
                     {% for option in note_options %}
                     <option value="{{ option }}" {% if option in note_filter %}selected{% endif %}>{{ option }}</option>
@@ -121,22 +166,22 @@
                 </select>
             </div>
 
-            <!-- 状态 -->
+            <!-- status -->
             <div class="col-md-1">
-                <label class="form-label small">状态</label>
+                <label class="form-label small">{{ t('Status') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="status" multiple>
-                    <option value="Unlabeled" {% if 'Unlabeled' in status_filter %}selected{% endif %}>Unlabeled</option>
-                    <option value="Labeled" {% if 'Labeled' in status_filter %}selected{% endif %}>Labeled</option>
-                    <option value="Prelabeled" {% if 'Prelabeled' in status_filter %}selected{% endif %}>Prelabeled</option>
-                    <option value="Historical" {% if 'Historical' in status_filter %}selected{% endif %}>Historical</option>
-                    <option value="Incomplete" {% if 'Incomplete' in status_filter %}selected{% endif %}>Incomplete</option>
+                    <option value="Unlabeled" {% if 'Unlabeled' in status_filter %}selected{% endif %}>{{ t('Unlabeled') }}</option>
+                    <option value="Labeled" {% if 'Labeled' in status_filter %}selected{% endif %}>{{ t('Labeled') }}</option>
+                    <option value="Prelabeled" {% if 'Prelabeled' in status_filter %}selected{% endif %}>{{ t('Prelabeled') }}</option>
+                    <option value="Historical" {% if 'Historical' in status_filter %}selected{% endif %}>{{ t('Historical') }}</option>
+                    <option value="Incomplete" {% if 'Incomplete' in status_filter %}selected{% endif %}>{{ t('Incomplete') }}</option>
                 </select>
             </div>
 
-            <!-- 第二行 -->
+            <!-- Second row -->
             <!-- Review Date Range -->
             <div class="col-md-4">
-                <label class="form-label small">Review Date Range</label>
+                <label class="form-label small">{{ t('Review Date Range') }}</label>
                 <div class="input-group input-group-sm">
                     <input type="date" class="form-control" name="start_date" value="{{ start_date or '' }}">
                     <span class="input-group-text">-</span>
@@ -146,7 +191,7 @@
 
             <!-- total_comments -->
             <div class="col-md-2">
-                <label class="form-label small">Total Comments</label>
+                <label class="form-label small">{{ t('Total Comments') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="total_comments" multiple>
                     {% for option in total_comments_options %}
                     <option value="{{ option }}" {% if option in total_comments_filter %}selected{% endif %}>{{ option }}</option>
@@ -156,7 +201,7 @@
 
             <!-- last_total_comments -->
             <div class="col-md-2">
-                <label class="form-label small">Last Total Comments</label>
+                <label class="form-label small">{{ t('Last Total Comments') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="last_total_comments" multiple>
                     {% for option in last_total_comments_options %}
                     <option value="{{ option }}" {% if option in last_total_comments_filter %}selected{% endif %}>{{ option }}</option>
@@ -164,10 +209,10 @@
                 </select>
             </div>
 
-            <!-- 第三行：属性筛选 -->
-            <!-- 属性1 -->
+            <!-- Third row: attribute filters -->
+            <!-- Attribute 1 -->
             <div class="col-md-2">
-                <label class="form-label small">属性1</label>
+                <label class="form-label small">{{ t('Attribute 1') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="attr1" multiple>
                     {% for option in attr1_options %}
                     <option value="{{ option }}" {% if option in attr1_filter %}selected{% endif %}>{{ option }}</option>
@@ -175,9 +220,9 @@
                 </select>
             </div>
 
-            <!-- 属性2 -->
+            <!-- Attribute 2 -->
             <div class="col-md-2">
-                <label class="form-label small">属性2</label>
+                <label class="form-label small">{{ t('Attribute 2') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="attr2" multiple>
                     {% for option in attr2_options %}
                     <option value="{{ option }}" {% if option in attr2_filter %}selected{% endif %}>{{ option }}</option>
@@ -185,9 +230,9 @@
                 </select>
             </div>
 
-            <!-- 属性3 -->
+            <!-- Attribute 3 -->
             <div class="col-md-2">
-                <label class="form-label small">属性3</label>
+                <label class="form-label small">{{ t('Attribute 3') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="attr3" multiple>
                     {% for option in attr3_options %}
                     <option value="{{ option }}" {% if option in attr3_filter %}selected{% endif %}>{{ option }}</option>
@@ -195,9 +240,9 @@
                 </select>
             </div>
 
-            <!-- 属性4 -->
+            <!-- Attribute 4 -->
             <div class="col-md-2">
-                <label class="form-label small">属性4</label>
+                <label class="form-label small">{{ t('Attribute 4') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="attr4" multiple>
                     {% for option in attr4_options %}
                     <option value="{{ option }}" {% if option in attr4_filter %}selected{% endif %}>{{ option }}</option>
@@ -205,9 +250,9 @@
                 </select>
             </div>
 
-            <!-- 属性5 -->
+            <!-- Attribute 5 -->
             <div class="col-md-2">
-                <label class="form-label small">属性5</label>
+                <label class="form-label small">{{ t('Attribute 5') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="attr5" multiple>
                     {% for option in attr5_options %}
                     <option value="{{ option }}" {% if option in attr5_filter %}selected{% endif %}>{{ option }}</option>
@@ -215,34 +260,34 @@
                 </select>
             </div>
 
-            <!-- 操作按钮 -->
+            <!-- Action buttons -->
             <div class="col-md-2 d-flex align-items-end">
                 <button type="submit" class="btn btn-primary btn-sm me-2">
-                    <i class="fas fa-search"></i> 筛选
+                    <i class="fas fa-search"></i> {{ t('Filter') }}
                 </button>
                 <a href="{{ url_for('labeling.samples') }}" class="btn btn-secondary btn-sm">
-                    <i class="fas fa-redo"></i> 重置
+                    <i class="fas fa-redo"></i> {{ t('Reset') }}
                 </a>
             </div>
         </form>
     </div>
 </div>
 
-<!-- 批量操作 -->
+<!-- Batch actions -->
 <div class="card mb-3" id="batchActionsCard" style="display: none;">
     <div class="card-body d-flex align-items-center">
         <button id="batchLabelBtn" class="btn btn-primary" disabled>
-            <i class="fas fa-tags"></i> 批量打标
+            <i class="fas fa-tags"></i> {{ t('Batch Label') }}
         </button>
         <span class="ms-3 text-muted">
-            已选择 <span id="selectedCount" class="badge bg-secondary">0</span> 条记录
+            {{ t('Selected') }} <span id="selectedCount" class="badge bg-secondary">0</span> {{ t('record(s)') }}
         </span>
     </div>
 </div>
 
-<!-- 样本表格 -->
+<!-- Sample table -->
 <form id="batchEditForm" method="POST" action="{{ url_for('labeling.batch_save') }}">
-<!-- 隐藏字段: 传递当前页码和筛选条件 -->
+<!-- Hidden fields: pass current page number and filter conditions -->
 <input type="hidden" name="current_page" value="{{ pagination.page }}">
 <input type="hidden" name="keyword" value="{{ keyword }}">
 {% for s in status_filter %}
@@ -292,19 +337,19 @@
         <thead class="table-dark">
             <tr>
                 <th style="width: 30px;"><input class="form-check-input" type="checkbox" id="selectAllCheckbox"></th>
-                <th style="width: 40px;">ID</th>
-                <th style="width: 80px;">品牌</th>
-                <th style="width: 300px;">产品描述</th>
-                <th style="width: 200px;">SKU</th>
-                <th style="width: 50px;">链接</th>
-                <th style="width: 50px;">评论</th>
-                <th style="width: 90px;">Note</th>
-                <th style="width: 120px;">属性1</th>
-                <th style="width: 120px;">属性2</th>
-                <th style="width: 120px;">属性3</th>
-                <th style="width: 120px;">属性4</th>
-                <th style="width: 120px;">属性5</th>
-                <th style="width: 70px;">状态</th>
+                <th style="width: 40px;">{{ t('ID') }}</th>
+                <th style="width: 80px;">{{ t('Brand') }}</th>
+                <th style="width: 300px;">{{ t('Product Description') }}</th>
+                <th style="width: 200px;">{{ t('SKU') }}</th>
+                <th style="width: 50px;">{{ t('Link') }}</th>
+                <th style="width: 50px;">{{ t('Comments') }}</th>
+                <th style="width: 90px;">{{ t('Note') }}</th>
+                <th style="width: 120px;">{{ t('Attribute 1') }}</th>
+                <th style="width: 120px;">{{ t('Attribute 2') }}</th>
+                <th style="width: 120px;">{{ t('Attribute 3') }}</th>
+                <th style="width: 120px;">{{ t('Attribute 4') }}</th>
+                <th style="width: 120px;">{{ t('Attribute 5') }}</th>
+                <th style="width: 70px;">{{ t('Status') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -325,11 +370,11 @@
                 </td>
                 <td>
                     {% if sample.sku_url %}
-                    <a href="{{ sample.sku_url }}" target="_blank" class="btn btn-sm btn-link" title="SKU链接">
+                    <a href="{{ sample.sku_url }}" target="_blank" class="btn btn-sm btn-link sample-link" data-link-id="{{ sample.id }}" title="SKU link">
                         <i class="fas fa-external-link-alt"></i>
                     </a>
                     {% elif sample.url %}
-                    <a href="{{ sample.url }}" target="_blank" class="btn btn-sm btn-link" title="产品链接">
+                    <a href="{{ sample.url }}" target="_blank" class="btn btn-sm btn-link sample-link" data-link-id="{{ sample.id }}" title="Product link">
                         <i class="fas fa-external-link-alt"></i>
                     </a>
                     {% else %}
@@ -338,10 +383,10 @@
                 </td>
                 <td>{{ sample.total_comments or '-' }}</td>
 
-                <!-- Note (只读显示) -->
+                <!-- Note (read-only display) -->
                 <td>{{ sample.note or '-' }}</td>
 
-                <!-- 可编辑的属性字段 -->
+                <!-- Editable attribute fields -->
                 <td>
                     <input type="hidden" name="sample_ids[]" value="{{ sample.id }}">
                     <input type="hidden" name="status_{{ sample.id }}" value="{{ sample.status or '' }}">
@@ -356,15 +401,15 @@
                                name="attr1_{{ sample.id }}" 
                                data-attr="1"
                                data-sample-id="{{ sample.id }}"
+                               data-brand="{{ sample.brand or '' }}"
                                value="{{ sample.prod_attributes1 or '' }}"
-                               list="attr1_datalist"
-                               placeholder="输入或选择"
+                               list="attr1_datalist_{{ sample.id }}"
                                autocomplete="off">
                         <button class="btn btn-outline-secondary btn-sm add-custom-label-btn" 
                                 type="button" 
                                 data-attr="1"
                                 data-sample-id="{{ sample.id }}"
-                                title="新建标签">
+                                title="{{ t('Add new label') }}">
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
@@ -376,15 +421,15 @@
                                name="attr2_{{ sample.id }}" 
                                data-attr="2"
                                data-sample-id="{{ sample.id }}"
+                               data-brand="{{ sample.brand or '' }}"
                                value="{{ sample.prod_attributes2 or '' }}"
-                               list="attr2_datalist"
-                               placeholder="输入或选择"
+                               list="attr2_datalist_{{ sample.id }}"
                                autocomplete="off">
                         <button class="btn btn-outline-secondary btn-sm add-custom-label-btn" 
                                 type="button" 
                                 data-attr="2"
                                 data-sample-id="{{ sample.id }}"
-                                title="新建标签">
+                                title="{{ t('Add new label') }}">
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
@@ -396,15 +441,15 @@
                                name="attr3_{{ sample.id }}" 
                                data-attr="3"
                                data-sample-id="{{ sample.id }}"
+                               data-brand="{{ sample.brand or '' }}"
                                value="{{ sample.prod_attributes3 or '' }}"
-                               list="attr3_datalist"
-                               placeholder="输入或选择"
+                               list="attr3_datalist_{{ sample.id }}"
                                autocomplete="off">
                         <button class="btn btn-outline-secondary btn-sm add-custom-label-btn" 
                                 type="button" 
                                 data-attr="3"
                                 data-sample-id="{{ sample.id }}"
-                                title="新建标签">
+                                title="{{ t('Add new label') }}">
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
@@ -416,15 +461,15 @@
                                name="attr4_{{ sample.id }}" 
                                data-attr="4"
                                data-sample-id="{{ sample.id }}"
+                               data-brand="{{ sample.brand or '' }}"
                                value="{{ sample.prod_attributes4 or '' }}"
-                               list="attr4_datalist"
-                               placeholder="输入或选择"
+                               list="attr4_datalist_{{ sample.id }}"
                                autocomplete="off">
                         <button class="btn btn-outline-secondary btn-sm add-custom-label-btn" 
                                 type="button" 
                                 data-attr="4"
                                 data-sample-id="{{ sample.id }}"
-                                title="新建标签">
+                                title="{{ t('Add new label') }}">
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
@@ -436,15 +481,15 @@
                                name="attr5_{{ sample.id }}" 
                                data-attr="5"
                                data-sample-id="{{ sample.id }}"
+                               data-brand="{{ sample.brand or '' }}"
                                value="{{ sample.prod_attributes5 or '' }}"
-                               list="attr5_datalist"
-                               placeholder="输入或选择"
+                               list="attr5_datalist_{{ sample.id }}"
                                autocomplete="off">
                         <button class="btn btn-outline-secondary btn-sm add-custom-label-btn" 
                                 type="button" 
                                 data-attr="5"
                                 data-sample-id="{{ sample.id }}"
-                                title="新建标签">
+                                title="{{ t('Add new label') }}">
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
@@ -452,102 +497,75 @@
 
                 <td>
                     {% if sample.status == 'Labeled' %}
-                        <span class="badge bg-success">Labeled</span>
+                        <span class="badge bg-success">{{ t('Labeled') }}</span>
                     {% elif sample.status == 'Historical' %}
-                        <span class="badge bg-info">Historical</span>
+                        <span class="badge bg-info">{{ t('Historical') }}</span>
                     {% elif sample.status == 'Incomplete' %}
-                        <span class="badge bg-secondary">Incomplete</span>
+                        <span class="badge bg-secondary">{{ t('Incomplete') }}</span>
                     {% elif sample.status == 'Prelabeled' %}
-                        <span class="badge bg-primary">Prelabeled</span>
+                        <span class="badge bg-primary">{{ t('Prelabeled') }}</span>
                         <div class="form-check mt-1">
                             <input class="form-check-input prelabel-accept" type="checkbox" 
                                    name="accept_{{ sample.id }}" id="accept_{{ sample.id }}" value="1">
-                            <label class="form-check-label small" for="accept_{{ sample.id }}">接受</label>
+                            <label class="form-check-label small" for="accept_{{ sample.id }}">{{ t('Accept') }}</label>
                         </div>
                     {% else %}
-                        <span class="badge bg-warning">Unlabeled</span>
+                        <span class="badge bg-warning">{{ t('Unlabeled') }}</span>
                     {% endif %}
                 </td>
             </tr>
             {% else %}
             <tr>
-                <td colspan="14" class="text-center text-muted">暂无数据</td>
+                <td colspan="14" class="text-center text-muted">{{ t('No data') }}</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
 
-<!-- Datalist for autocomplete -->
-<datalist id="attr1_datalist">
-    {% for option in attr1_options %}
-    <option value="{{ option }}">
-    {% endfor %}
-</datalist>
-<datalist id="attr2_datalist">
-    {% for option in attr2_options %}
-    <option value="{{ option }}">
-    {% endfor %}
-</datalist>
-<datalist id="attr3_datalist">
-    {% for option in attr3_options %}
-    <option value="{{ option }}">
-    {% endfor %}
-</datalist>
-<datalist id="attr4_datalist">
-    {% for option in attr4_options %}
-    <option value="{{ option }}">
-    {% endfor %}
-</datalist>
-<datalist id="attr5_datalist">
-    {% for option in attr5_options %}
-    <option value="{{ option }}">
-    {% endfor %}
-</datalist>
-
-<!-- 自定义标签模态框 -->
+<!-- Custom label modal -->
 <div class="modal fade" id="customLabelModal" tabindex="-1">
     <div class="modal-dialog modal-sm">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">添加自定义标签</h5>
+                <h5 class="modal-title">{{ t('Add Custom Label') }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <div class="mb-3">
-                    <label class="form-label">属性 <span id="customLabelAttrNum"></span></label>
-                    <input type="text" class="form-control" id="customLabelInput" placeholder="输入新标签">
+                    <label class="form-label">{{ t('Attribute 1').split(' ')[0] }} <span id="customLabelAttrNum"></span></label>
+                    <input type="text" class="form-control" id="customLabelInput" placeholder="{{ t('Enter new label') }}">
                 </div>
                 <div class="alert alert-warning small mb-0">
-                    <i class="fas fa-exclamation-triangle"></i> 请确认新标签不存在于现有选项中，避免重复或拼写错误。
+                    <i class="fas fa-exclamation-triangle"></i> {{ t('Please confirm the new label does not already exist in the current options, to avoid duplicates or typos.') }}
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-primary" id="confirmCustomLabel">确认添加</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t('Cancel') }}</button>
+                <button type="button" class="btn btn-primary" id="confirmCustomLabel">{{ t('Confirm') }}</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- 底部提交按钮 -->
+<!-- Bottom submit buttons -->
 {% if samples %}
 <div class="card mt-3 mb-3">
     <div class="card-body">
         <div class="row">
             <div class="col-md-8">
                 <button type="submit" class="btn btn-success btn-lg">
-                    <i class="fas fa-save"></i> 保存当前页修改
+                    <i class="fas fa-save"></i> {{ t('Save Changes on This Page') }}
                 </button>
                 <button type="button" class="btn btn-secondary btn-lg ms-2" onclick="location.reload()">
-                    <i class="fas fa-undo"></i> 取消重置
+                    <i class="fas fa-undo"></i> {{ t('Cancel / Reset') }}
                 </button>
             </div>
             <div class="col-md-4 text-end">
                 <small class="text-muted">
-                    提示: 修改过的数据将变为LABELED；<br>
-                    Prelabeled需勾选"接受"才会变为LABELED；<br>
-                    Historical未修改则保持不变。
+                    {{ t('Modified data becomes LABELED;') }}<br>
+                    {{ t('Prelabeled must be checked as "Accept" to become LABELED;') }}<br>
+                    {{ t('Historical stays unchanged if not modified.') }}
                 </small>
             </div>
         </div>
@@ -556,12 +574,12 @@
 {% endif %}
 </form>
 
-<!-- 分页 -->
+<!-- Pagination -->
 {% if pagination.pages > 1 %}
 <nav>
     <ul class="pagination justify-content-center">
         <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-            <a class="page-link" href="{{ build_filter_url(pagination.prev_num) }}">上一页</a>
+            <a class="page-link" href="{{ build_filter_url(pagination.prev_num) }}">{{ t('Previous') }}</a>
         </li>
 
         {% for page_num in pagination.iter_pages(left_edge=2, right_edge=2, left_current=2, right_current=2) %}
@@ -575,35 +593,107 @@
         {% endfor %}
 
         <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-            <a class="page-link" href="{{ build_filter_url(pagination.next_num) }}">下一页</a>
+            <a class="page-link" href="{{ build_filter_url(pagination.next_num) }}">{{ t('Next') }}</a>
         </li>
     </ul>
 </nav>
-<p class="text-center text-muted">共 {{ pagination.total }} 条数据，当前第 {{ pagination.page }}/{{ pagination.pages }} 页</p>
+<p class="text-center text-muted">{{ pagination.total }} {{ t('records in total') }}, {{ t('page') }} {{ pagination.page }}/{{ pagination.pages }}</p>
 {% endif %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
 $(document).ready(function() {
+    // 字段名 -> 接口键 映射（接口键与后端 CASCADE_FIELD_MAP 一致）
+    const filterKeyMap = {
+        'eretailer': 'eRetailer',
+        'online_store': 'online_store',
+        'brand': 'brand',
+        'note': 'note',
+        'is_competitor': 'is_competitor',
+        'total_comments': 'total_comments',
+        'last_total_comments': 'last_total_comments',
+        'attr1': 'attr1', 'attr2': 'attr2', 'attr3': 'attr3', 'attr4': 'attr4', 'attr5': 'attr5'
+    };
+
     // 初始化multiselect插件
     $('.multiselect-filter').multiselect({
         buttonWidth: '100%',
         enableFiltering: true,
         enableCaseInsensitiveFiltering: true,
-        filterPlaceholder: '搜索...',
-        nonSelectedText: '请选择',
-        nSelectedText: '个已选择',
-        allSelectedText: '全选',
+        filterPlaceholder: '{{ t("Search...") }}',
+        nonSelectedText: '{{ t("Please select") }}',
+        nSelectedText: '{{ t("selected") }}',
+        allSelectedText: '{{ t("Select All") }}',
         maxHeight: 200,
         buttonClass: 'form-select form-select-sm d-flex align-items-center',
         templates: {
             button: '<button type="button" class="multiselect dropdown-toggle" data-bs-toggle="dropdown"><span class="multiselect-selected-text"></span></button>',
+        },
+        // 多级联动：变化时仅更新其它筛选项候选范围，不刷新数据
+        onChange: function() {
+            refreshFilterOptions();
         }
     });
-    
+
     // 刷新multiselect以确保选中状态正确显示
     $('.multiselect-filter').multiselect('refresh');
+
+    // 为某个候选列表右上角注入"全选/清空"功能键
+    function addSelectClearActions(sel) {
+        const $sel = $(sel);
+        const $container = $sel.closest('.btn-group, .multiselect-native-select');
+        const $menu = $container.find('.dropdown-menu');
+        if (!$menu.length || $menu.find('.multiselect-actions').length) return;
+        const $bar = $('<div class="multiselect-actions d-flex justify-content-end gap-2 px-2 py-1 border-bottom"></div>');
+        const $all = $('<button type="button" class="btn btn-link btn-sm p-0 small">{{ t("Select All") }}</button>');
+        const $clear = $('<button type="button" class="btn btn-link btn-sm p-0 small text-secondary">{{ t("Clear") }}</button>');
+        $all.on('click', function(e) {
+            e.preventDefault();
+            $sel.multiselect('selectAll', false);
+            $sel.multiselect('updateButtonText');
+            refreshFilterOptions();
+        });
+        $clear.on('click', function(e) {
+            e.preventDefault();
+            $sel.multiselect('deselectAll', false);
+            $sel.multiselect('updateButtonText');
+            refreshFilterOptions();
+        });
+        $bar.append($all).append($clear);
+        $menu.prepend($bar);
+    }
+    $('.multiselect-filter').each(function() { addSelectClearActions(this); });
+
+    // AJAX 联动：根据当前选择缩小其它筛选项候选项，数据列表仅在点击 Filter 时刷新
+    let cascadeRequest = null;
+    function refreshFilterOptions() {
+        const params = $('#sampleFilterForm').serialize();
+        if (cascadeRequest) { cascadeRequest.abort(); }
+        cascadeRequest = $.getJSON("{{ url_for('labeling.filter_options') }}", params, function(opts) {
+            $('.multiselect-filter').each(function() {
+                const name = $(this).attr('name');
+                const key = filterKeyMap[name];
+                if (!key || !opts[key]) return; // status 不参与联动
+                const selected = $(this).val() || [];
+                const candidates = opts[key];
+                const $sel = $(this);
+                $sel.empty();
+                candidates.forEach(function(v) {
+                    const isSel = selected.indexOf(String(v)) !== -1;
+                    $sel.append($('<option>', { value: v, text: v, selected: isSel }));
+                });
+                // 保留已选但不在候选范围内的值，避免丢失当前选择
+                selected.forEach(function(v) {
+                    if (candidates.map(String).indexOf(String(v)) === -1) {
+                        $sel.append($('<option>', { value: v, text: v, selected: true }));
+                    }
+                });
+                $sel.multiselect('rebuild');
+                addSelectClearActions($sel);
+            });
+        });
+    }
 });
 
 // 属性标签验证和自定义标签逻辑
@@ -612,11 +702,11 @@ let currentAttrNum = null;
 
 // 获取所有属性选项数据
 const attrOptions = {
-    1: {{ attr1_options|tojson }},
-    2: {{ attr2_options|tojson }},
-    3: {{ attr3_options|tojson }},
-    4: {{ attr4_options|tojson }},
-    5: {{ attr5_options|tojson }}
+    1: JSON.parse('{{ attr1_options|tojson|safe }}'),
+    2: JSON.parse('{{ attr2_options|tojson|safe }}'),
+    3: JSON.parse('{{ attr3_options|tojson|safe }}'),
+    4: JSON.parse('{{ attr4_options|tojson|safe }}'),
+    5: JSON.parse('{{ attr5_options|tojson|safe }}')
 };
 
 // 验证输入值是否在选项列表中
@@ -671,6 +761,96 @@ document.querySelectorAll('.attr-input').forEach(function(input) {
     });
 });
 
+// ===== 行内属性候选标签联动：填写任一 Attribute 会缩小同行其它 Attribute 候选 =====
+// 获取当前已选品牌（候选标签仅受 Brand + Attribute1-5 影响）
+function getBrandFilter() {
+    return $('select[name="brand"]').val() || [];
+}
+
+// 获取筛选控件中某个 Attribute 的已选值（作为方案C的"基线"）
+function getFilterAttr(n) {
+    return $(`select[name="attr${n}"]`).val() || [];
+}
+
+// 获取某行的品牌：优先本行数据的 brand（本行 brand 必属于筛选 brand，
+// 因此是"在筛选控件层基础上进一步收缩"）；即使筛选控件未选 brand，
+// 也用本行 brand 过滤候选。行 brand 缺失时回退到筛选控件 brand。
+function getRowBrand(sampleId) {
+    const inp = document.querySelector(`input[name="attr1_${sampleId}"]`);
+    const b = inp && inp.dataset.brand ? inp.dataset.brand.trim() : '';
+    return b ? [b] : getBrandFilter();
+}
+
+// 为某行的5个 Attribute 创建按行 datalist，初始用全量候选填充
+function buildRowDatalists(sampleId) {
+    for (let n = 1; n <= 5; n++) {
+        const id = `attr${n}_datalist_${sampleId}`;
+        if (document.getElementById(id)) continue;
+        const dl = document.createElement('datalist');
+        dl.id = id;
+        (attrOptions[n] || []).forEach(function(v) {
+            const o = document.createElement('option');
+            o.value = v;
+            dl.appendChild(o);
+        });
+        document.body.appendChild(dl);
+    }
+}
+
+// 拉取并更新某行的候选标签（attr1-5 互相联动）
+const rowRequests = {};
+function refreshRowLabelOptions(sampleId) {
+    // 方案C（叠加式统一）：在"筛选控件层(brand + attr1-5)"这一基线上，
+    // 再用本行数据进一步收缩，且下拉与校验共用同一口径：
+    // - brand：优先本行 brand（本行 brand ⊆ 筛选 brand，是进一步收缩；
+    //          即使筛选控件未选 brand，也按本行 brand 过滤）。
+    // - attrN：本行已填值优先，否则回退到筛选控件该字段的选中值（基线）。
+    // 因结果始终是校验基线的子集，从下拉里选出的合法值不会被误判为"新标签"。
+    const params = { brand: getRowBrand(sampleId) };
+    for (let n = 1; n <= 5; n++) {
+        const inp = document.querySelector(`input[name="attr${n}_${sampleId}"]`);
+        const val = inp ? inp.value.trim() : '';
+        params[`attr${n}`] = val ? [val] : getFilterAttr(n);
+    }
+    if (rowRequests[sampleId]) { rowRequests[sampleId].abort(); }
+    rowRequests[sampleId] = $.getJSON("{{ url_for('labeling.label_options') }}", $.param(params, true), function(opts) {
+        for (let n = 1; n <= 5; n++) {
+            const dl = document.getElementById(`attr${n}_datalist_${sampleId}`);
+            if (!dl) continue;
+            dl.innerHTML = '';
+            (opts[`attr${n}`] || []).forEach(function(v) {
+                const o = document.createElement('option');
+                o.value = v;
+                dl.appendChild(o);
+                // 关键修复：把服务端返回的联动候选并入全局校验集，
+                // 保证"下拉里出现的合法DB值"不会被校验判为"新标签"。
+                // （全局 attrOptions 初始受 1000 上限与筛选范围限制，可能不含联动候选）
+                if (attrOptions[n] && attrOptions[n].indexOf(v) === -1) {
+                    attrOptions[n].push(v);
+                }
+            });
+        }
+    });
+}
+
+// 初始化每行 datalist，并绑定联动
+const rowNarrowed = {};
+document.querySelectorAll('.attr-input').forEach(function(input) {
+    buildRowDatalists(input.dataset.sampleId);
+    // 首次聚焦该行时，立即按"本行 brand + 已填 attr"收窄下拉，
+    // 使用户开始编辑这一行就看到统一的行级候选口径（不再宽/窄反复跳动）。
+    input.addEventListener('focus', function() {
+        const sid = this.dataset.sampleId;
+        if (!rowNarrowed[sid]) {
+            rowNarrowed[sid] = true;
+            refreshRowLabelOptions(sid);
+        }
+    });
+    input.addEventListener('change', function() {
+        refreshRowLabelOptions(this.dataset.sampleId);
+    });
+});
+
 // 新建标签按钮点击事件
 document.querySelectorAll('.add-custom-label-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
@@ -689,13 +869,13 @@ document.querySelectorAll('.add-custom-label-btn').forEach(function(btn) {
 document.getElementById('confirmCustomLabel').addEventListener('click', function() {
     const newLabel = document.getElementById('customLabelInput').value.trim();
     if (!newLabel) {
-        alert('请输入标签内容');
+        alert('{{ t("Enter new label") }}');
         return;
     }
     
     // 检查标签是否已存在
     if (isValidOption(currentAttrNum, newLabel)) {
-        alert('该标签已存在，请直接在输入框中输入选择');
+        alert('{{ t("This label already exists, please select it in the input box") }}');
         return;
     }
     
@@ -703,12 +883,15 @@ document.getElementById('confirmCustomLabel').addEventListener('click', function
         // 设置输入框的值
         currentInputElement.value = newLabel;
         
-        // 添加到选项列表和datalist
+        // 添加到选项列表和当前行的datalist
         attrOptions[currentAttrNum].push(newLabel);
-        const datalist = document.getElementById(`attr${currentAttrNum}_datalist`);
-        const option = document.createElement('option');
-        option.value = newLabel;
-        datalist.appendChild(option);
+        const sampleId = currentInputElement.dataset.sampleId;
+        const datalist = document.getElementById(`attr${currentAttrNum}_datalist_${sampleId}`);
+        if (datalist) {
+            const option = document.createElement('option');
+            option.value = newLabel;
+            datalist.appendChild(option);
+        }
         
         // 标记为有效
         currentInputElement.classList.remove('is-invalid');
@@ -747,7 +930,7 @@ document.getElementById('batchEditForm').addEventListener('submit', function(e) 
         e.preventDefault();
         const invalidCount = invalidInputs.length;
         const firstInvalid = invalidInputs[0];
-        alert(`发现 ${invalidCount} 个无效的属性值！\n\n例如: 属性${firstInvalid.attr}中的"${firstInvalid.value}"不在已有标签列表中。\n\n请使用"新建标签"按钮添加新标签，或选择已有的标签。`);
+        alert(`{{ t('Found') }} ${invalidCount} {{ t('invalid attribute value(s)! e.g. value not in label list. Use the New Label button or pick an existing one.') }}`);
         // 聚焦到第一个无效输入框
         const firstInvalidInput = document.querySelector(`input[data-sample-id="${firstInvalid.sampleId}"][data-attr="${firstInvalid.attr}"]`);
         if (firstInvalidInput) {
@@ -758,7 +941,7 @@ document.getElementById('batchEditForm').addEventListener('submit', function(e) 
     }
     
     // 验证通过，显示确认对话框
-    const confirmationMessage = "确认保存当前页修改吗？";
+    const confirmationMessage = "{{ t('Save changes on this page?') }}";
     if (!confirm(confirmationMessage)) {
         e.preventDefault();
     }
@@ -790,6 +973,23 @@ document.addEventListener('keydown', function(event) {
 
 // 批量选择逻辑
 document.addEventListener('DOMContentLoaded', function() {
+    // Link 点击记忆：已点击过的链接显示不同颜色
+    const VISITED_KEY = 'visitedSampleLinks';
+    let visited = [];
+    try { visited = JSON.parse(localStorage.getItem(VISITED_KEY)) || []; } catch (e) { visited = []; }
+    const visitedSet = new Set(visited);
+    document.querySelectorAll('.sample-link').forEach(function(link) {
+        const id = link.dataset.linkId;
+        if (visitedSet.has(id)) link.classList.add('visited');
+        link.addEventListener('click', function() {
+            link.classList.add('visited');
+            if (!visitedSet.has(id)) {
+                visitedSet.add(id);
+                localStorage.setItem(VISITED_KEY, JSON.stringify(Array.from(visitedSet)));
+            }
+        });
+    });
+
     const selectAllCheckbox = document.getElementById('selectAllCheckbox');
     const sampleCheckboxes = document.querySelectorAll('.sample-checkbox');
     const batchActionsCard = document.getElementById('batchActionsCard');
@@ -845,7 +1045,9 @@ document.addEventListener('DOMContentLoaded', function() {
                                      .map(cb => cb.value)
                                      .join(',');
             if (selectedIds) {
-                window.location.href = "{{ url_for('labeling.batch_label') }}?ids=" + selectedIds;
+                // 附带当前筛选条件，批量打标后可返回并保留 filter
+                const filters = $('#sampleFilterForm').serialize();
+                window.location.href = "{{ url_for('labeling.batch_label') }}?ids=" + selectedIds + (filters ? "&" + filters : "");
             }
         });
     }

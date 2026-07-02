@@ -1,12 +1,100 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_login import current_user
 from app.models import SampleData, db
 from app.utils.decorators import login_required
 from app.utils.cache import cached, clear_cache
+from app.utils.audit import log_action, diff_fields, snapshot_fields
 from sqlalchemy import and_, or_
 from datetime import datetime
+import uuid
 
 bp = Blueprint('labeling', __name__, url_prefix='/labeling')
+
+# 联动筛选字段映射: 筛选键 -> 模型字段
+CASCADE_FIELD_MAP = {
+    'eRetailer': SampleData.eRetailer,
+    'online_store': SampleData.online_store,
+    'brand': SampleData.brand,
+    'note': SampleData.note,
+    'is_competitor': SampleData.is_competitor,
+    'total_comments': SampleData.total_comments,
+    'last_total_comments': SampleData.last_total_comments,
+    'attr1': SampleData.prod_attributes1,
+    'attr2': SampleData.prod_attributes2,
+    'attr3': SampleData.prod_attributes3,
+    'attr4': SampleData.prod_attributes4,
+    'attr5': SampleData.prod_attributes5,
+}
+
+def compute_cascade_options(selected):
+    """计算各筛选字段的候选项，实现多级联动。
+    selected: dict, 键为筛选键, 值为已选值列表。
+    每个字段的候选项基于权限 + 除自身外的其它已选条件计算。
+    返回: dict, 键为筛选键, 值为排序后的候选项列表。
+    """
+    options = {}
+    for key, field in CASCADE_FIELD_MAP.items():
+        opt_query = db.session.query(field).filter(field.isnot(None), field != '')
+
+        # 权限过滤
+        if current_user.category_arr is not None:
+            opt_query = opt_query.filter(SampleData.category.in_(current_user.category_arr))
+        if current_user.brand_arr is not None:
+            opt_query = opt_query.filter(SampleData.brand.in_(current_user.brand_arr))
+
+        # 应用其它筛选条件（联动），排除自身
+        for fkey, fvalues in selected.items():
+            if fkey == key or not fvalues:
+                continue
+            ffield = CASCADE_FIELD_MAP.get(fkey)
+            if ffield is not None:
+                opt_query = opt_query.filter(ffield.in_(fvalues))
+
+        results = opt_query.distinct().limit(1000).all()
+        options[key] = sorted([item[0] for item in results])
+    return options
+
+# 打标候选标签字段：仅 Brand + Attribute1-5 参与联动（不含时间/评论量等条件）
+LABEL_FIELD_MAP = {
+    'brand': SampleData.brand,
+    'attr1': SampleData.prod_attributes1,
+    'attr2': SampleData.prod_attributes2,
+    'attr3': SampleData.prod_attributes3,
+    'attr4': SampleData.prod_attributes4,
+    'attr5': SampleData.prod_attributes5,
+}
+
+def compute_label_options(brand_values, attr_values):
+    """计算单条打标的候选标签（attr1-5），仅受 Brand + Attribute1-5 影响。
+    brand_values: 已选品牌列表。
+    attr_values: dict, 键 attr1-5, 值为该字段当前值列表（用于联动，排除自身）。
+    返回: dict, 键 attr1-5, 值为排序后的候选项列表。
+    """
+    selected = {'brand': brand_values}
+    selected.update(attr_values)
+
+    options = {}
+    for key in ('attr1', 'attr2', 'attr3', 'attr4', 'attr5'):
+        field = LABEL_FIELD_MAP[key]
+        opt_query = db.session.query(field).filter(field.isnot(None), field != '')
+
+        # 权限过滤
+        if current_user.category_arr is not None:
+            opt_query = opt_query.filter(SampleData.category.in_(current_user.category_arr))
+        if current_user.brand_arr is not None:
+            opt_query = opt_query.filter(SampleData.brand.in_(current_user.brand_arr))
+
+        # 应用 Brand + 其它 Attribute 条件（联动），排除自身
+        for fkey, fvalues in selected.items():
+            if fkey == key or not fvalues:
+                continue
+            ffield = LABEL_FIELD_MAP.get(fkey)
+            if ffield is not None:
+                opt_query = opt_query.filter(ffield.in_(fvalues))
+
+        results = opt_query.distinct().limit(1000).all()
+        options[key] = sorted([item[0] for item in results])
+    return options
 
 # 缓存辅助函数
 @cached(timeout=600, user_specific=True)  # 缓存10分钟,并根据用户权限区分
@@ -194,26 +282,75 @@ def samples():
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     samples = pagination.items
 
-    # 使用新的缓存函数直接获取有权限的筛选选项
-    eretailer_options = get_distinct_options_for_user('eRetailer')
-    online_store_options = get_distinct_options_for_user('online_store')
-    brand_options = get_distinct_options_for_user('brand')
-    note_options = get_distinct_options_for_user('note')
-    is_competitor_options = get_distinct_options_for_user('is_competitor')
-    total_comments_options = get_distinct_options_for_user('total_comments')
-    last_total_comments_options = get_distinct_options_for_user('last_total_comments')
+    # 多级联动筛选：每个下拉框的候选项基于"其它已选筛选条件"动态计算，
+    # 从而实现选择一个条件后，其它条件的候选项自动缩小到对应范围。
+    selected_filters = {
+        'eRetailer': eretailer_filter,
+        'online_store': online_store_filter,
+        'brand': brand_filter,
+        'note': note_filter,
+        'is_competitor': is_competitor_filter,
+        'total_comments': total_comments_filter,
+        'last_total_comments': last_total_comments_filter,
+        'attr1': attr1_filter,
+        'attr2': attr2_filter,
+        'attr3': attr3_filter,
+        'attr4': attr4_filter,
+        'attr5': attr5_filter,
+    }
+    cascade_options = compute_cascade_options(selected_filters)
 
-    # 属性字段选项(使用新的缓存函数)
-    attr1_options = get_attribute_options_for_user(1)
-    attr2_options = get_attribute_options_for_user(2)
-    attr3_options = get_attribute_options_for_user(3)
-    attr4_options = get_attribute_options_for_user(4)
-    attr5_options = get_attribute_options_for_user(5)
+    eretailer_options = cascade_options['eRetailer']
+    online_store_options = cascade_options['online_store']
+    brand_options = cascade_options['brand']
+    note_options = cascade_options['note']
+    is_competitor_options = cascade_options['is_competitor']
+    total_comments_options = cascade_options['total_comments']
+    last_total_comments_options = cascade_options['last_total_comments']
+
+    # 属性字段选项（候选标签）：仅受 Brand + Attribute1-5 影响，时间/评论量等不参与
+    label_options = compute_label_options(
+        brand_filter,
+        {
+            'attr1': attr1_filter,
+            'attr2': attr2_filter,
+            'attr3': attr3_filter,
+            'attr4': attr4_filter,
+            'attr5': attr5_filter,
+        }
+    )
+    attr1_options = label_options['attr1']
+    attr2_options = label_options['attr2']
+    attr3_options = label_options['attr3']
+    attr4_options = label_options['attr4']
+    attr5_options = label_options['attr5']
+
+    # 进度统计（仅按用户权限范围，不受当前筛选影响），用于在列表页展示进度条
+    prog_query = SampleData.query
+    if current_user.category_arr is not None:
+        prog_query = prog_query.filter(SampleData.category.in_(current_user.category_arr))
+    if current_user.brand_arr is not None:
+        prog_query = prog_query.filter(SampleData.brand.in_(current_user.brand_arr))
+    prog_total = prog_query.count()
+    prog_unlabeled = prog_query.filter(or_(SampleData.status == 'Unlabeled', SampleData.status.is_(None), SampleData.status == '')).count()
+    prog_labeled = prog_query.filter_by(status='Labeled').count()
+    prog_prelabeled = prog_query.filter_by(status='Prelabeled').count()
+    prog_historical = prog_query.filter_by(status='Historical').count()
+    prog_incomplete = prog_query.filter_by(status='Incomplete').count()
+    progress_stats = {
+        'total': prog_total,
+        'unlabeled': prog_unlabeled,
+        'labeled': prog_labeled,
+        'prelabeled': prog_prelabeled,
+        'historical': prog_historical,
+        'incomplete': prog_incomplete,
+    }
 
     return render_template('labeling/samples.html',
                          samples=samples,
                          pagination=pagination,
                          keyword=keyword,
+                         progress_stats=progress_stats,
                          status_filter=status_filter_display,
                          eretailer_filter=eretailer_filter,
                          online_store_filter=online_store_filter,
@@ -242,6 +379,28 @@ def samples():
                          attr4_options=attr4_options,
                          attr5_options=attr5_options)
 
+@bp.route('/filter-options')
+@login_required
+def filter_options():
+    """返回各筛选字段的联动候选项（AJAX）。
+    根据当前已选条件实时计算其它字段的候选项，但不刷新数据列表。
+    """
+    selected = {key: request.args.getlist(key) for key in CASCADE_FIELD_MAP}
+    options = compute_cascade_options(selected)
+    return jsonify(options)
+
+@bp.route('/label-options')
+@login_required
+def label_options():
+    """返回单条打标的候选标签（attr1-5），实现 Attribute 之间的层级联动。
+    仅受 Brand + Attribute1-5 影响：选填某 Attribute 会缩小其它 Attribute 候选。
+    参数: brand[] 当前筛选品牌; attr1-5 当前行已填写的值。
+    """
+    brand_values = request.args.getlist('brand')
+    attr_values = {f'attr{i}': request.args.getlist(f'attr{i}') for i in range(1, 6)}
+    options = compute_label_options(brand_values, attr_values)
+    return jsonify(options)
+
 @bp.route('/samples/<int:sample_id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_sample(sample_id):
@@ -254,6 +413,17 @@ def edit_sample(sample_id):
         return redirect(url_for('labeling.samples'))
 
     if request.method == 'POST':
+        # 记录修改前的快照（用于溯源/找回）
+        old_values = {
+            'note': sample.note,
+            'prod_attributes1': sample.prod_attributes1,
+            'prod_attributes2': sample.prod_attributes2,
+            'prod_attributes3': sample.prod_attributes3,
+            'prod_attributes4': sample.prod_attributes4,
+            'prod_attributes5': sample.prod_attributes5,
+            'status': sample.status,
+        }
+
         # 更新打标字段
         sample.note = request.form.get('note', '').strip()
         sample.prod_attributes1 = request.form.get('prod_attributes1', '').strip()
@@ -273,8 +443,26 @@ def edit_sample(sample_id):
 
         if attr1 and any(attr_others):
             sample.status = 'Labeled'
+        elif not attr1 and not any(attr_others):
+            sample.status = 'Unlabeled'
         else:
             sample.status = 'Incomplete'
+
+        # 审计日志：记录字段级前后值，支持一键找回
+        new_values = {
+            'note': sample.note,
+            'prod_attributes1': sample.prod_attributes1,
+            'prod_attributes2': sample.prod_attributes2,
+            'prod_attributes3': sample.prod_attributes3,
+            'prod_attributes4': sample.prod_attributes4,
+            'prod_attributes5': sample.prod_attributes5,
+            'status': sample.status,
+        }
+        if diff_fields(old_values, new_values):
+            # 记录全字段快照（含未变更的属性），便于长期归档后完整恢复
+            log_action('label_edit', 'sample', sample.id,
+                       snapshot_fields(old_values, new_values),
+                       detail=f'单条打标 ID {sample.id}', sample=sample)
 
         db.session.commit()
         clear_cache(user_specific=True)  # 只清空当前用户相关的缓存
@@ -307,21 +495,23 @@ def edit_sample(sample_id):
             return redirect(url_for('labeling.samples'))
 
     # 获取每个字段已有的不重复的值（用于下拉选择），应用权限过滤
-    brand_tuple = tuple(current_user.brand_arr) if current_user.brand_arr else None
-    category_tuple = tuple(current_user.category_arr) if current_user.category_arr else None
-
-    # 使用缓存函数获取候选项（缓存完整数据+内存过滤）
-    all_attr1 = get_all_attribute_options(1)
-    all_attr2 = get_all_attribute_options(2)
-    all_attr3 = get_all_attribute_options(3)
-    all_attr4 = get_all_attribute_options(4)
-    all_attr5 = get_all_attribute_options(5)
-    
-    attr1_options = filter_attribute_options(all_attr1, brand_tuple, category_tuple)
-    attr2_options = filter_attribute_options(all_attr2, brand_tuple, category_tuple)
-    attr3_options = filter_attribute_options(all_attr3, brand_tuple, category_tuple)
-    attr4_options = filter_attribute_options(all_attr4, brand_tuple, category_tuple)
-    attr5_options = filter_attribute_options(all_attr5, brand_tuple, category_tuple)
+    # 候选标签仅受 Brand + Attribute1-5 影响，并随本条已填写的属性联动缩小
+    brand_scope = [sample.brand] if sample.brand else []
+    label_opts = compute_label_options(
+        brand_scope,
+        {
+            'attr1': [sample.prod_attributes1] if sample.prod_attributes1 else [],
+            'attr2': [sample.prod_attributes2] if sample.prod_attributes2 else [],
+            'attr3': [sample.prod_attributes3] if sample.prod_attributes3 else [],
+            'attr4': [sample.prod_attributes4] if sample.prod_attributes4 else [],
+            'attr5': [sample.prod_attributes5] if sample.prod_attributes5 else [],
+        }
+    )
+    attr1_options = label_opts['attr1']
+    attr2_options = label_opts['attr2']
+    attr3_options = label_opts['attr3']
+    attr4_options = label_opts['attr4']
+    attr5_options = label_opts['attr5']
 
     return render_template('labeling/edit_sample.html',
                          sample=sample,
@@ -335,6 +525,22 @@ def edit_sample(sample_id):
 @login_required
 def batch_label():
     """批量打标"""
+    # 收集需要透传的筛选条件（用于返回列表时保留 filter）
+    filter_keys_multi = ['status', 'eretailer', 'online_store', 'brand', 'note',
+                         'is_competitor', 'total_comments', 'last_total_comments',
+                         'attr1', 'attr2', 'attr3', 'attr4', 'attr5']
+    filter_keys_single = ['keyword', 'start_date', 'end_date', 'page']
+    source = request.form if request.method == 'POST' else request.args
+    saved_filters = {}
+    for k in filter_keys_multi:
+        vals = source.getlist(k)
+        if vals:
+            saved_filters[k] = vals
+    for k in filter_keys_single:
+        v = source.get(k)
+        if v:
+            saved_filters[k] = v
+
     # 获取选中的ID列表
     ids_str = request.args.get('ids', '')
     if request.method == 'POST':
@@ -342,14 +548,14 @@ def batch_label():
 
     if not ids_str:
         flash('未选择任何记录', 'warning')
-        return redirect(url_for('labeling.samples'))
+        return redirect(url_for('labeling.samples', **saved_filters))
 
     # 解析ID列表
     try:
         ids = [int(id_str.strip()) for id_str in ids_str.split(',') if id_str.strip()]
     except ValueError:
         flash('无效的ID列表', 'danger')
-        return redirect(url_for('labeling.samples'))
+        return redirect(url_for('labeling.samples', **saved_filters))
 
     # 查询样本
     samples = SampleData.query.filter(SampleData.id.in_(ids)).all()
@@ -358,7 +564,7 @@ def batch_label():
     for sample in samples:
         if not current_user.has_permission(sample.category, sample.brand):
             flash(f'无权限访问样本 ID {sample.id}', 'danger')
-            return redirect(url_for('labeling.samples'))
+            return redirect(url_for('labeling.samples', **saved_filters))
 
     if request.method == 'POST':
         # 批量更新打标字段
@@ -368,8 +574,28 @@ def batch_label():
         prod_attributes4 = request.form.get('prod_attributes4', '').strip()
         prod_attributes5 = request.form.get('prod_attributes5', '').strip()
 
+        # 记忆本次批量打标填写的属性值（下次进入自动回填）
+        session['batch_label_attrs'] = {
+            'attr1': prod_attributes1,
+            'attr2': prod_attributes2,
+            'attr3': prod_attributes3,
+            'attr4': prod_attributes4,
+            'attr5': prod_attributes5,
+        }
+
+        # 同一次提交的批量日志打同一个分组 token，便于一键批量回滚
+        batch_group = uuid.uuid4().hex[:12]
+
         # 更新所有选中的样本
         for sample in samples:
+            old_values = {
+                'prod_attributes1': sample.prod_attributes1,
+                'prod_attributes2': sample.prod_attributes2,
+                'prod_attributes3': sample.prod_attributes3,
+                'prod_attributes4': sample.prod_attributes4,
+                'prod_attributes5': sample.prod_attributes5,
+                'status': sample.status,
+            }
             if prod_attributes1:
                 sample.prod_attributes1 = prod_attributes1
             if prod_attributes2:
@@ -392,25 +618,51 @@ def batch_label():
 
             if attr1 and any(attr_others):
                 sample.status = 'Labeled'
+            elif not attr1 and not any(attr_others):
+                sample.status = 'Unlabeled'
             else:
                 sample.status = 'Incomplete'
+
+            # 审计：记录每条样本的字段级前后值
+            new_values = {
+                'prod_attributes1': sample.prod_attributes1,
+                'prod_attributes2': sample.prod_attributes2,
+                'prod_attributes3': sample.prod_attributes3,
+                'prod_attributes4': sample.prod_attributes4,
+                'prod_attributes5': sample.prod_attributes5,
+                'status': sample.status,
+            }
+            if diff_fields(old_values, new_values):
+                # 记录全字段快照（含未变更的属性），便于长期归档后完整恢复
+                log_action('batch_label', 'sample', sample.id,
+                           snapshot_fields(old_values, new_values),
+                           detail=f'批量打标 ID {sample.id} [grp:{batch_group}]', sample=sample)
 
         db.session.commit()
         clear_cache()  # 清空缓存,使新打标值立即可用
         flash(f'成功批量打标 {len(samples)} 条记录', 'success')
-        return redirect(url_for('labeling.samples'))
+        return redirect(url_for('labeling.samples', **saved_filters))
 
     # GET请求:显示批量打标表单
-    # 使用新的缓存函数直接获取有权限的打标选项
-    attr1_options = get_attribute_options_for_user(1)
-    attr2_options = get_attribute_options_for_user(2)
-    attr3_options = get_attribute_options_for_user(3)
-    attr4_options = get_attribute_options_for_user(4)
-    attr5_options = get_attribute_options_for_user(5)
+    # 候选项仅受筛选控件中的 Brand + Attribute1-5 影响（与单条打标一致）
+    label_opts = compute_label_options(
+        saved_filters.get('brand', []),
+        {f'attr{i}': saved_filters.get(f'attr{i}', []) for i in range(1, 6)}
+    )
+    attr1_options = label_opts['attr1']
+    attr2_options = label_opts['attr2']
+    attr3_options = label_opts['attr3']
+    attr4_options = label_opts['attr4']
+    attr5_options = label_opts['attr5']
+
+    # 回填上一次批量打标填写的值
+    remembered = session.get('batch_label_attrs', {})
 
     return render_template('labeling/batch_label.html',
                          samples=samples,
                          ids_str=ids_str,
+                         saved_filters=saved_filters,
+                         remembered=remembered,
                          attr1_options=attr1_options,
                          attr2_options=attr2_options,
                          attr3_options=attr3_options,
@@ -439,6 +691,9 @@ def batch_save():
 
         manual_update_count = 0
         prelabel_accept_count = 0
+
+        # 同一次提交的批量日志打同一个分组 token，便于一键批量回滚
+        batch_group = uuid.uuid4().hex[:12]
 
         for sample_id in sample_ids:
             sample = SampleData.query.get(int(sample_id))
@@ -482,6 +737,11 @@ def batch_save():
             # 根据新逻辑处理
             if changed:
                 # 情况1/5: 有修改，无论之前状态如何
+                old_snapshot = {
+                    'prod_attributes1': orig_attr1, 'prod_attributes2': orig_attr2,
+                    'prod_attributes3': orig_attr3, 'prod_attributes4': orig_attr4,
+                    'prod_attributes5': orig_attr5, 'status': orig_status,
+                }
                 sample.prod_attributes1 = attr1
                 sample.prod_attributes2 = attr2
                 sample.prod_attributes3 = attr3
@@ -491,9 +751,21 @@ def batch_save():
                 # 根据新逻辑决定状态
                 if attr1 and any([attr2, attr3, attr4, attr5]):
                     sample.status = 'Labeled'
+                elif not any([attr1, attr2, attr3, attr4, attr5]):
+                    sample.status = 'Unlabeled'
                 else:
                     sample.status = 'Incomplete'
                 manual_update_count += 1
+                new_snapshot = {
+                    'prod_attributes1': attr1, 'prod_attributes2': attr2,
+                    'prod_attributes3': attr3, 'prod_attributes4': attr4,
+                    'prod_attributes5': attr5, 'status': sample.status,
+                }
+                if diff_fields(old_snapshot, new_snapshot):
+                    # 记录全字段快照（含未变更的属性），便于长期归档后完整恢复
+                    log_action('batch_save', 'sample', sample.id,
+                               snapshot_fields(old_snapshot, new_snapshot),
+                               detail=f'整页保存 ID {sample.id} [grp:{batch_group}]', sample=sample)
             elif is_prelabeled and accepted:
                 # 情况2: Prelabeled + 没修改 + 点击了接受
                 # 检查是否满足Labeled条件
@@ -502,6 +774,20 @@ def batch_save():
                 else:
                     sample.status = 'Incomplete'
                 prelabel_accept_count += 1
+                # 接受预打标虽未改属性，但同样记录全部属性快照（old==new），
+                # 保证长期归档后仅凭日志即可完整恢复整行数据
+                accept_attrs = {
+                    'prod_attributes1': sample.prod_attributes1,
+                    'prod_attributes2': sample.prod_attributes2,
+                    'prod_attributes3': sample.prod_attributes3,
+                    'prod_attributes4': sample.prod_attributes4,
+                    'prod_attributes5': sample.prod_attributes5,
+                }
+                accept_old = {**accept_attrs, 'status': 'Prelabeled'}
+                accept_new = {**accept_attrs, 'status': sample.status}
+                log_action('batch_save', 'sample', sample.id,
+                           snapshot_fields(accept_old, accept_new),
+                           detail=f'接受预打标 ID {sample.id} [grp:{batch_group}]', sample=sample)
             # 情况3: Prelabeled + 没修改 + 没点击接受 → 不处理，保持Prelabeled
             # 情况4: Historical + 没修改 → 不处理，保持Historical
 

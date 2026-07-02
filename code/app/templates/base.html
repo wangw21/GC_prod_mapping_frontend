@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="{{ current_lang }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}打标平台{% endblock %}</title>
+    <title>{% block title %}{{ t('Labeling Platform') }}{% endblock %}</title>
     <link href="{{ url_for('static', filename='css/vendor/bootstrap.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/vendor/all.min.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/vendor/bootstrap-multiselect.min.css') }}" rel="stylesheet">
@@ -71,30 +71,39 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <!-- 导航栏 -->
+    <!-- Navigation bar -->
     <nav class="navbar navbar-expand-lg navbar-light">
         <div class="container-fluid">
             <a class="navbar-brand" href="{{ url_for('main.index') }}">
-                <i class="fas fa-tags"></i> 打标平台
+                <i class="fas fa-tags"></i> {{ t('Labeling Platform') }}
             </a>
-            {% if current_user.is_authenticated %}
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="langDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-globe"></i> {{ '中文' if current_lang == 'zh' else 'English' }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item {% if current_lang == 'en' %}active{% endif %}" href="{{ url_for('set_language', lang='en') }}">English</a></li>
+                            <li><a class="dropdown-item {% if current_lang == 'zh' %}active{% endif %}" href="{{ url_for('set_language', lang='zh') }}">中文</a></li>
+                        </ul>
+                    </li>
+                    {% if current_user.is_authenticated %}
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-user"></i> {{ current_user.real_name or current_user.username }}
                             <span class="badge bg-secondary">{{ current_user.role }}</span>
                         </a>
                         <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="fas fa-sign-out-alt"></i> 退出登录</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}"><i class="fas fa-sign-out-alt"></i> {{ t('Logout') }}</a></li>
                         </ul>
                     </li>
+                    {% endif %}
                 </ul>
             </div>
-            {% endif %}
         </div>
     </nav>
 
@@ -102,47 +111,55 @@
    
     <div class="container-fluid">
         <div class="row">
-            <!-- 侧边栏 -->
+            {% if current_user.is_data_admin %}
+            <!-- Sidebar (Data_admin only) -->
             <nav class="col-md-2 col-lg-1 d-md-block bg-light sidebar" id="sidebar">
                 <div class="sidebar-sticky">
                     <ul class="nav flex-column">
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('labeling.stats') }}">
-                                <i class="fas fa-chart-bar"></i> 数据统计
+                                <i class="fas fa-chart-bar"></i> {{ t('Statistics') }}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('labeling.samples', status=['Prelabeled', 'Unlabeled'], note='New Link') }}">
-                                <i class="fas fa-list"></i> 样本列表
+                                <i class="fas fa-list"></i> {{ t('Sample List') }}
                             </a>
                         </li>
 
-                        {% if current_user.is_data_admin %}
                         <li class="nav-item mt-3">
-                            <h6 class="sidebar-heading px-3 text-muted">管理员功能</h6>
+                            <h6 class="sidebar-heading px-3 text-muted">{{ t('Admin Functions') }}</h6>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('admin.upload') }}">
-                                <i class="fas fa-upload"></i> 上传数据
+                                <i class="fas fa-upload"></i> {{ t('Upload Data') }}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('admin.users') }}">
-                                <i class="fas fa-users"></i> 用户管理
+                                <i class="fas fa-users"></i> {{ t('User Management') }}
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('admin.download') }}">
-                                <i class="fas fa-download"></i> 下载数据
+                                <i class="fas fa-download"></i> {{ t('Download Data') }}
                             </a>
                         </li>
-                        {% endif %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('admin.logs') }}">
+                                <i class="fas fa-history"></i> {{ t('Operation Logs') }}
+                            </a>
+                        </li>
                     </ul>
                 </div>
             </nav>
 
             <!-- 主内容区 -->
             <main class="col-md-10 col-lg-11 ms-sm-auto px-md-4" id="mainContent">
+            {% else %}
+            <!-- 主内容区（非 Data_admin 无侧边栏，整宽显示） -->
+            <main class="col-12 px-md-4" id="mainContent">
+            {% endif %}
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}
                         <div class="mt-3">
@@ -161,7 +178,7 @@
         </div>
     </div>
     {% else %}
-    <!-- 未登录时的内容 -->
+    <!-- Content when not logged in -->
     <main class="container mt-5">
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
@@ -184,7 +201,7 @@
     {% block extra_js %}{% endblock %}
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // 仅在页面上存在侧边栏时才执行相关逻辑
+            // Only run sidebar logic when the sidebar exists on the page
             const sidebar = document.getElementById('sidebar');
             if (!sidebar) return;
 

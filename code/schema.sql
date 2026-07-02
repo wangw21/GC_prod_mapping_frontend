@@ -56,6 +56,32 @@ CREATE TABLE `sample_data` (
   INDEX idx_category_brand (category, brand)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='样本数据表';
 
+-- =====================================================
+-- 表3: 操作审计日志表（数据更改溯源/找回）
+-- =====================================================
+CREATE TABLE `audit_log` (
+  `id` INT PRIMARY KEY AUTO_INCREMENT,
+  `created_at` DATETIME DEFAULT NULL COMMENT '操作时间',
+  `user_id` INT DEFAULT NULL COMMENT '操作用户ID',
+  `username` VARCHAR(50) DEFAULT NULL COMMENT '操作用户名(冗余,便于溯源)',
+  `action` VARCHAR(50) DEFAULT NULL COMMENT '操作类型: label_edit/batch_label/batch_save/upload/clear_data/user_*/revert',
+  `entity_type` VARCHAR(30) DEFAULT NULL COMMENT '对象类型: sample/user/data',
+  `entity_id` INT DEFAULT NULL COMMENT '对象ID(当月自增id,跨月不稳定,仅供快速查看)',
+  `product_description` TEXT DEFAULT NULL COMMENT '业务身份:产品描述(稳定键)',
+  `sku` TEXT DEFAULT NULL COMMENT '业务身份:SKU(稳定键)',
+  `url` TEXT DEFAULT NULL COMMENT '业务身份:URL(稳定键)',
+  `sku_url` TEXT DEFAULT NULL COMMENT '业务身份:SKU_URL(稳定键)',
+  `changes` JSON DEFAULT NULL COMMENT '字段级前后值快照,用于回滚',
+  `detail` TEXT DEFAULT NULL COMMENT '人类可读摘要',
+  `ip` VARCHAR(45) DEFAULT NULL COMMENT '操作来源IP',
+  `reverted` TINYINT(1) DEFAULT 0 COMMENT '是否已回滚',
+  INDEX idx_created_at (created_at),
+  INDEX idx_user_id (user_id),
+  INDEX idx_action (action),
+  INDEX idx_entity_type (entity_type),
+  INDEX idx_entity_id (entity_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='操作审计日志表';
+
 -- 性能优化索引脚本
 -- 用于优化百万级数据的筛选和打标候选项查询
 

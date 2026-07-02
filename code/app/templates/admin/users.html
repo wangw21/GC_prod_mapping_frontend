@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}用户管理{% endblock %}
+{% block title %}{{ t('User Management') }}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-users"></i> 用户管理</h1>
+    <h1 class="h2"><i class="fas fa-users"></i> {{ t('User Management') }}</h1>
     <a href="{{ url_for('admin.create_user') }}" class="btn btn-primary">
-        <i class="fas fa-plus"></i> 创建用户
+        <i class="fas fa-plus"></i> {{ t('Create User') }}
     </a>
 </div>
 
@@ -15,13 +15,13 @@
         <thead class="table-dark">
             <tr>
                 <th>ID</th>
-                <th>用户名</th>
-                <th>真实姓名</th>
-                <th>角色</th>
-                <th>Category权限</th>
-                <th>Brand权限</th>
-                <th>状态</th>
-                <th>操作</th>
+                <th>{{ t('Username') }}</th>
+                <th>{{ t('Real Name') }}</th>
+                <th>{{ t('Role') }}</th>
+                <th>{{ t('Category Permission') }}</th>
+                <th>{{ t('Brand Permission') }}</th>
+                <th>{{ t('Status') }}</th>
+                <th>{{ t('Operation') }}</th>
             </tr>
         </thead>
         <tbody>
@@ -41,37 +41,37 @@
                 </td>
                 <td>
                     {% if user.category_arr is none %}
-                        <span class="badge bg-success">全部</span>
+                        <span class="badge bg-success">{{ t('All') }}</span>
                     {% elif user.category_arr|length == 0 %}
-                        <span class="badge bg-secondary">无</span>
+                        <span class="badge bg-secondary">{{ t('None') }}</span>
                     {% else %}
                         <small>{{ user.category_arr|join(', ') }}</small>
                     {% endif %}
                 </td>
                 <td>
                     {% if user.brand_arr is none %}
-                        <span class="badge bg-success">全部</span>
+                        <span class="badge bg-success">{{ t('All') }}</span>
                     {% elif user.brand_arr|length == 0 %}
-                        <span class="badge bg-secondary">无</span>
+                        <span class="badge bg-secondary">{{ t('None') }}</span>
                     {% else %}
                         <small>{{ user.brand_arr|join(', ') }}</small>
                     {% endif %}
                 </td>
                 <td>
                     {% if user.is_active %}
-                        <span class="badge bg-success">启用</span>
+                        <span class="badge bg-success">{{ t('Enable') }}</span>
                     {% else %}
-                        <span class="badge bg-secondary">禁用</span>
+                        <span class="badge bg-secondary">{{ t('Disable') }}</span>
                     {% endif %}
                 </td>
                 <td>
                     <a href="{{ url_for('admin.edit_user', user_id=user.id) }}" class="btn btn-sm btn-primary">
-                        <i class="fas fa-edit"></i> 编辑
+                        <i class="fas fa-edit"></i> {{ t('Edit') }}
                     </a>
                     <form method="POST" action="{{ url_for('admin.toggle_user', user_id=user.id) }}" class="d-inline">
                         <button type="submit" class="btn btn-sm btn-{% if user.is_active %}warning{% else %}success{% endif %}">
                             <i class="fas fa-{% if user.is_active %}ban{% else %}check{% endif %}"></i>
-                            {% if user.is_active %}禁用{% else %}启用{% endif %}
+                            {% if user.is_active %}{{ t('Disable') }}{% else %}{{ t('Enable') }}{% endif %}
                         </button>
                     </form>
                 </td>

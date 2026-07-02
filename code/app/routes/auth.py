@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, current_user
 from app.models import User, db
+from app.i18n import t
 
 bp = Blueprint('auth', __name__, url_prefix='/auth')
 
@@ -19,11 +20,11 @@ def login():
 
         if user and user.check_password(password):
             if not user.is_active:
-                flash('账号已被禁用', 'danger')
+                flash(t('Account is disabled'), 'danger')
                 return render_template('auth/login.html')
 
             login_user(user, remember=remember)
-            flash(f'欢迎回来, {user.real_name or user.username}!', 'success')
+            flash(t('Welcome back') + ', ' + (user.real_name or user.username) + '!', 'success')
 
             # 重定向到之前访问的页面
             next_page = request.args.get('next')
@@ -31,7 +32,7 @@ def login():
                 return redirect(next_page)
             return redirect(url_for('main.index'))
         else:
-            flash('用户名或密码错误', 'danger')
+            flash(t('Incorrect username or password'), 'danger')
 
     return render_template('auth/login.html')
 
@@ -39,5 +40,5 @@ def login():
 def logout():
     """登出"""
     logout_user()
-    flash('已退出登录', 'info')
+    flash(t('Logged out'), 'info')
     return redirect(url_for('auth.login'))
