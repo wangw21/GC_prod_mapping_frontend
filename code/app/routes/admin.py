@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime
 from werkzeug.utils import secure_filename
 from threading import Thread
+from sqlalchemy import text
 
 bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -210,16 +211,24 @@ def download():
 @bp.route('/clear_data', methods=['POST'])
 @admin_required
 def clear_data():
-    """清除所有样本数据"""
+    """
+    清除 sample_data 表中的所有数据。
+    """
     try:
-        # 使用更高效的 delete() 方法
-        num_deleted = db.session.query(SampleData).delete()
+        # 使用 TRUNCATE 命令高效地清空表
+        db.session.execute(text('TRUNCATE TABLE sample_data'))
         db.session.commit()
-        clear_cache() # 清空所有缓存
-        flash(f'成功删除 {num_deleted} 条样本数据', 'success')
+
+        # 如果有缓存，也一并清除
+        clear_cache() 
+
+        # 显示一个固定的成功消息，而不是显示删除的行数
+        flash('数据已成功清除！', 'success')
+
     except Exception as e:
         db.session.rollback()
         flash(f'清除数据失败: {str(e)}', 'danger')
+
     return redirect(url_for('admin.download'))
 
 @bp.route('/dashboard', methods=['GET'])
