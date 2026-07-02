@@ -11,4 +11,7 @@ nohup.out
 uploads/
 exports/
 *.bak
+<<<<<<< HEAD
 Sample.csv
+=======
+>>>>>>> e3a8212a0994bbbcc7c098eccf7c32aa3f310ecc
