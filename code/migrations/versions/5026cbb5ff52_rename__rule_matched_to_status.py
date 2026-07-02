@@ -16,7 +16,16 @@ branch_labels = None
 depends_on = None
 
 
+def _get_column_names(table_name):
+    inspector = sa.inspect(op.get_bind())
+    return {column['name'] for column in inspector.get_columns(table_name)}
+
+
 def upgrade():
+    sample_columns = _get_column_names('sample_data')
+    if 'status' in sample_columns or '_rule_matched' not in sample_columns:
+        return
+
     with op.batch_alter_table('sample_data', schema=None) as batch_op:
         batch_op.alter_column('_rule_matched', new_column_name='status', existing_type=sa.String(length=255))
 

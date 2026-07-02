@@ -16,7 +16,15 @@ branch_labels = None
 depends_on = None
 
 
+def _has_table(table_name):
+    inspector = sa.inspect(op.get_bind())
+    return table_name in inspector.get_table_names()
+
+
 def upgrade():
+    if _has_table('audit_log'):
+        return
+
     op.create_table(
         'audit_log',
         sa.Column('id', sa.Integer(), nullable=False),

@@ -19,12 +19,23 @@ branch_labels = None
 depends_on = None
 
 
+def _get_column_names(table_name):
+    inspector = sa.inspect(op.get_bind())
+    return {column['name'] for column in inspector.get_columns(table_name)}
+
+
 def upgrade():
+    audit_columns = _get_column_names('audit_log')
+
     with op.batch_alter_table('audit_log', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('product_description', sa.Text(), nullable=True))
-        batch_op.add_column(sa.Column('sku', sa.Text(), nullable=True))
-        batch_op.add_column(sa.Column('url', sa.Text(), nullable=True))
-        batch_op.add_column(sa.Column('sku_url', sa.Text(), nullable=True))
+        if 'product_description' not in audit_columns:
+            batch_op.add_column(sa.Column('product_description', sa.Text(), nullable=True))
+        if 'sku' not in audit_columns:
+            batch_op.add_column(sa.Column('sku', sa.Text(), nullable=True))
+        if 'url' not in audit_columns:
+            batch_op.add_column(sa.Column('url', sa.Text(), nullable=True))
+        if 'sku_url' not in audit_columns:
+            batch_op.add_column(sa.Column('sku_url', sa.Text(), nullable=True))
 
 
 def downgrade():
