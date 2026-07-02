@@ -312,9 +312,9 @@ def clear_data():
     """
     try:
         # 使用 TRUNCATE 命令高效地清空表
+        num_deleted = SampleData.query.count()  # 获取删除的样本数量
         db.session.execute(text('TRUNCATE TABLE sample_data'))
         db.session.commit()
-        num_deleted = SampleData.query.count()  # 获取删除的样本数量
         clear_cache() # 清空所有缓存
         log_action('clear_data', 'data', detail=f'清除全部样本数据，共 {num_deleted} 条')
         db.session.commit()
