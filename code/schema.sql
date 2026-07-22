@@ -48,7 +48,7 @@ CREATE TABLE `sample_data` (
   `prod_attributes3` VARCHAR(255) DEFAULT NULL COMMENT '打标字段3',
   `prod_attributes4` VARCHAR(255) DEFAULT NULL COMMENT '打标字段4',
   `prod_attributes5` VARCHAR(255) DEFAULT NULL COMMENT '打标字段5',
-  `status` VARCHAR(255) DEFAULT NULL COMMENT '打标状态, Labeled, Unlabeled, Prelabeled, Historical, Incomplete',
+  `status` VARCHAR(255) DEFAULT NULL COMMENT '打标状态, Labeled, Unlabeled, Prelabeled, Historical, Incomplete, Uncertain',
 
   INDEX idx_category (category),
   INDEX idx_brand (brand),

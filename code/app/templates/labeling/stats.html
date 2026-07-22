@@ -9,7 +9,7 @@
 
 <!-- 总体统计 -->
 <div class="row mb-4">
-    <div class="col-lg-2 col-md-4 mb-3">
+    <div class="col-xl col-lg-3 col-md-4 mb-3">
         <div class="card text-center h-100">
             <div class="card-body">
                 <h5 class="card-title text-muted">{{ t('Total Data') }}</h5>
@@ -17,7 +17,7 @@
             </div>
         </div>
     </div>
-    <div class="col-lg-2 col-md-4 mb-3">
+    <div class="col-xl col-lg-3 col-md-4 mb-3">
         <div class="card text-center h-100">
             <div class="card-body">
                 <h5 class="card-title text-muted">Unlabeled</h5>
@@ -25,7 +25,7 @@
             </div>
         </div>
     </div>
-    <div class="col-lg-2 col-md-4 mb-3">
+    <div class="col-xl col-lg-3 col-md-4 mb-3">
         <div class="card text-center h-100">
             <div class="card-body">
                 <h5 class="card-title text-muted">Labeled</h5>
@@ -33,7 +33,7 @@
             </div>
         </div>
     </div>
-    <div class="col-lg-2 col-md-4 mb-3">
+    <div class="col-xl col-lg-3 col-md-4 mb-3">
         <div class="card text-center h-100">
             <div class="card-body">
                 <h5 class="card-title text-muted">Prelabeled</h5>
@@ -41,7 +41,7 @@
             </div>
         </div>
     </div>
-    <div class="col-lg-2 col-md-4 mb-3">
+    <div class="col-xl col-lg-3 col-md-4 mb-3">
         <div class="card text-center h-100">
             <div class="card-body">
                 <h5 class="card-title text-muted">Incomplete</h5>
@@ -49,11 +49,19 @@
             </div>
         </div>
     </div>
-    <div class="col-lg-2 col-md-4 mb-3">
+    <div class="col-xl col-lg-3 col-md-4 mb-3">
         <div class="card text-center h-100">
             <div class="card-body">
                 <h5 class="card-title text-muted">Historical</h5>
                 <h2 class="text-secondary">{{ historical_count }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl col-lg-3 col-md-4 mb-3">
+        <div class="card text-center h-100">
+            <div class="card-body">
+                <h5 class="card-title text-muted">Uncertain</h5>
+                <h2 class="text-warning">{{ uncertain_count }}</h2>
             </div>
         </div>
     </div>
@@ -76,6 +84,7 @@
                         <th>Labeled</th>
                         <th>Prelabeled</th>
                         <th>Historical</th>
+                        <th>Uncertain</th>
                         <th>{{ t('Progress') }} (Labeled+Historical+Incomplete)</th>
                     </tr>
                 </thead>
@@ -89,6 +98,7 @@
                         <td><span class="text-success">{{ stats.labeled }}</span></td>
                         <td><span class="text-info">{{ stats.prelabeled }}</span></td>
                         <td><span class="text-secondary">{{ stats.historical }}</span></td>
+                        <td><span class="text-warning">{{ stats.uncertain }}</span></td>
                         <td>
                             <div class="progress" style="height: 25px;">
                                 <div class="progress-bar bg-success" role="progressbar"

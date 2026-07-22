@@ -41,7 +41,7 @@ class Config:
 class DevelopmentConfig(Config):
     """开发环境配置"""
     DEBUG = True
-    SQLALCHEMY_ECHO = True
+    SQLALCHEMY_ECHO = str(os.environ.get('SQLALCHEMY_ECHO', '0')).lower() in ('1', 'true', 'yes')
 
 class ProductionConfig(Config):
     """生产环境配置"""

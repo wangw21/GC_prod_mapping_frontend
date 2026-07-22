@@ -4,8 +4,9 @@ from app.models import SampleData, db
 from app.utils.decorators import login_required
 from app.utils.cache import cached, clear_cache
 from app.utils.audit import log_action, diff_fields, snapshot_fields
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, func, case
 from datetime import datetime
+import re
 import uuid
 
 bp = Blueprint('labeling', __name__, url_prefix='/labeling')
@@ -26,6 +27,83 @@ CASCADE_FIELD_MAP = {
     'attr5': SampleData.prod_attributes5,
 }
 
+ATTRIBUTE_FILTER_KEYS = {'attr1', 'attr2', 'attr3', 'attr4', 'attr5'}
+EMPTY_FILTER_VALUE = '__FILTER_EMPTY__'
+SEARCH_FIELD_MAP = {
+    'product_description': SampleData.product_description,
+    'sku': SampleData.sku,
+    'category': SampleData.category,
+}
+SEARCH_FIELDS = tuple(SEARCH_FIELD_MAP.values())
+MAX_SEARCH_TERMS = 10
+MAX_SEARCH_TERM_LENGTH = 100
+
+
+def parse_search_terms(raw_value):
+    """按逗号、分号或换行拆分搜索词，保留包含空格的完整短语。"""
+    terms = []
+    seen = set()
+    truncated = False
+    for part in re.split(r'[,，;；\r\n]+', raw_value or ''):
+        term = part.strip()
+        if not term:
+            continue
+        if len(term) > MAX_SEARCH_TERM_LENGTH:
+            truncated = True
+        term = term[:MAX_SEARCH_TERM_LENGTH]
+        normalized = term.casefold()
+        if normalized not in seen:
+            seen.add(normalized)
+            terms.append(term)
+    return terms[:MAX_SEARCH_TERMS], truncated or len(terms) > MAX_SEARCH_TERMS
+
+
+def resolve_search_fields(requested_fields):
+    """解析搜索字段白名单；旧链接或空选择保持搜索全部字段。"""
+    valid_names = []
+    for field_name in requested_fields:
+        if field_name in SEARCH_FIELD_MAP and field_name not in valid_names:
+            valid_names.append(field_name)
+    if not valid_names:
+        valid_names = list(SEARCH_FIELD_MAP)
+    return valid_names, tuple(SEARCH_FIELD_MAP[name] for name in valid_names)
+
+
+def ci_contains(field, value):
+    """构造显式大小写不敏感的字面量包含条件。"""
+    escaped = value.lower().replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+    return func.lower(func.coalesce(field, '')).like(f'%{escaped}%', escape='\\')
+
+
+def empty_field_condition(field):
+    """NULL、空字符串和仅含空白的字符串均视为空值。"""
+    return or_(field.is_(None), func.trim(field) == '')
+
+
+def selected_value_condition(field, values):
+    """将普通多选值和筛选专用空值标记组合为同一个条件。"""
+    normal_values = [value for value in values if value != EMPTY_FILTER_VALUE]
+    conditions = []
+    if normal_values:
+        conditions.append(field.in_(normal_values))
+    if EMPTY_FILTER_VALUE in values:
+        conditions.append(empty_field_condition(field))
+    return or_(*conditions) if conditions else None
+
+
+def apply_selected_filters(query, selected, excluded_key=None):
+    """把联动下拉框的已选值应用到候选项查询。"""
+    for key, values in selected.items():
+        if key == excluded_key or not values:
+            continue
+        field = CASCADE_FIELD_MAP.get(key)
+        if field is not None:
+            condition = selected_value_condition(field, values)
+            if condition is not None:
+                query = query.filter(condition)
+    return query
+
+@cached(timeout=120, user_specific=True)
 def compute_cascade_options(selected):
     """计算各筛选字段的候选项，实现多级联动。
     selected: dict, 键为筛选键, 值为已选值列表。
@@ -34,7 +112,7 @@ def compute_cascade_options(selected):
     """
     options = {}
     for key, field in CASCADE_FIELD_MAP.items():
-        opt_query = db.session.query(field).filter(field.isnot(None), field != '')
+        opt_query = db.session.query(field)
 
         # 权限过滤
         if current_user.category_arr is not None:
@@ -43,15 +121,13 @@ def compute_cascade_options(selected):
             opt_query = opt_query.filter(SampleData.brand.in_(current_user.brand_arr))
 
         # 应用其它筛选条件（联动），排除自身
-        for fkey, fvalues in selected.items():
-            if fkey == key or not fvalues:
-                continue
-            ffield = CASCADE_FIELD_MAP.get(fkey)
-            if ffield is not None:
-                opt_query = opt_query.filter(ffield.in_(fvalues))
+        opt_query = apply_selected_filters(opt_query, selected, excluded_key=key)
 
-        results = opt_query.distinct().limit(1000).all()
-        options[key] = sorted([item[0] for item in results])
+        results = opt_query.filter(field.isnot(None), func.trim(field) != '').distinct().limit(1000).all()
+        values = sorted([item[0] for item in results])
+        if key in ATTRIBUTE_FILTER_KEYS:
+            values.insert(0, EMPTY_FILTER_VALUE)
+        options[key] = values
     return options
 
 # 打标候选标签字段：仅 Brand + Attribute1-5 参与联动（不含时间/评论量等条件）
@@ -64,6 +140,7 @@ LABEL_FIELD_MAP = {
     'attr5': SampleData.prod_attributes5,
 }
 
+@cached(timeout=120, user_specific=True)
 def compute_label_options(brand_values, attr_values):
     """计算单条打标的候选标签（attr1-5），仅受 Brand + Attribute1-5 影响。
     brand_values: 已选品牌列表。
@@ -90,7 +167,9 @@ def compute_label_options(brand_values, attr_values):
                 continue
             ffield = LABEL_FIELD_MAP.get(fkey)
             if ffield is not None:
-                opt_query = opt_query.filter(ffield.in_(fvalues))
+                condition = selected_value_condition(ffield, fvalues)
+                if condition is not None:
+                    opt_query = opt_query.filter(condition)
 
         results = opt_query.distinct().limit(1000).all()
         options[key] = sorted([item[0] for item in results])
@@ -155,6 +234,40 @@ def get_attribute_options_for_user(attr_num):
     options = sorted([item[0] for item in results])
     return options
 
+@cached(timeout=120, user_specific=True)
+def get_progress_stats_for_user():
+    """按当前用户权限获取列表页进度统计（缓存短时复用）。"""
+    prog_query = db.session.query(SampleData)
+    if current_user.category_arr is not None:
+        prog_query = prog_query.filter(SampleData.category.in_(current_user.category_arr))
+    if current_user.brand_arr is not None:
+        prog_query = prog_query.filter(SampleData.brand.in_(current_user.brand_arr))
+
+    return summarize_status_query(prog_query)
+
+
+def summarize_status_query(query):
+    """一次聚合查询返回指定数据范围的状态分布。"""
+    row = query.with_entities(
+        func.count(SampleData.id),
+        func.sum(case((or_(SampleData.status == 'Unlabeled', SampleData.status.is_(None), SampleData.status == ''), 1), else_=0)),
+        func.sum(case((SampleData.status == 'Labeled', 1), else_=0)),
+        func.sum(case((SampleData.status == 'Prelabeled', 1), else_=0)),
+        func.sum(case((SampleData.status == 'Historical', 1), else_=0)),
+        func.sum(case((SampleData.status == 'Incomplete', 1), else_=0)),
+        func.sum(case((SampleData.status == 'Uncertain', 1), else_=0))
+    ).first()
+
+    return {
+        'total': int(row[0] or 0),
+        'unlabeled': int(row[1] or 0),
+        'labeled': int(row[2] or 0),
+        'prelabeled': int(row[3] or 0),
+        'historical': int(row[4] or 0),
+        'incomplete': int(row[5] or 0),
+        'uncertain': int(row[6] or 0),
+    }
+
 @bp.route('/samples')
 @login_required
 def samples():
@@ -173,17 +286,37 @@ def samples():
     if current_user.brand_arr is not None:
         query = query.filter(SampleData.brand.in_(current_user.brand_arr))
 
-    # 搜索过滤（产品描述关键词）
-    keyword = request.args.get('keyword', '')
-    if keyword:
-        query = query.filter(
-            or_(
-                SampleData.product_description.like(f'%{keyword}%'),
-                SampleData.id.like(f'%{keyword}%'),
-                SampleData.sku.like(f'%{keyword}%'),
+    # 文本搜索：统一覆盖 category、product_description、sku。
+    keyword = request.args.get('keyword', '').strip()
+    keyword_mode = request.args.get('keyword_mode', 'all')
+    if keyword_mode not in ('all', 'any'):
+        keyword_mode = 'all'
+    exclude_terms = request.args.get('exclude_terms', '').strip()
+    keyword_field_names, keyword_search_fields = resolve_search_fields(
+        request.args.getlist('keyword_fields')
+    )
+    exclude_field_names, exclude_search_fields = resolve_search_fields(
+        request.args.getlist('exclude_fields')
+    )
 
-            )
-        )
+    keyword_terms, keyword_truncated = parse_search_terms(keyword)
+    excluded_terms, excluded_truncated = parse_search_terms(exclude_terms)
+    if keyword_truncated or excluded_truncated:
+        flash(f'每组最多支持 {MAX_SEARCH_TERMS} 个搜索词且单词最长 {MAX_SEARCH_TERM_LENGTH} 个字符，超出部分已忽略', 'warning')
+
+    if keyword_terms:
+        term_conditions = [or_(*(ci_contains(field, term) for field in keyword_search_fields))
+                           for term in keyword_terms]
+        query = query.filter(and_(*term_conditions) if keyword_mode == 'all'
+                             else or_(*term_conditions))
+
+    if excluded_terms:
+        excluded_condition = or_(*(
+            ci_contains(field, term)
+            for term in excluded_terms
+            for field in exclude_search_fields
+        ))
+        query = query.filter(~excluded_condition)
 
     # 筛选：eRetailer
     eretailer_filter = request.args.getlist('eretailer')
@@ -238,23 +371,27 @@ def samples():
     # 筛选：属性1-5
     attr1_filter = request.args.getlist('attr1')
     if attr1_filter:
-        query = query.filter(SampleData.prod_attributes1.in_(attr1_filter))
+        query = query.filter(selected_value_condition(SampleData.prod_attributes1, attr1_filter))
 
     attr2_filter = request.args.getlist('attr2')
     if attr2_filter:
-        query = query.filter(SampleData.prod_attributes2.in_(attr2_filter))
+        query = query.filter(selected_value_condition(SampleData.prod_attributes2, attr2_filter))
 
     attr3_filter = request.args.getlist('attr3')
     if attr3_filter:
-        query = query.filter(SampleData.prod_attributes3.in_(attr3_filter))
+        query = query.filter(selected_value_condition(SampleData.prod_attributes3, attr3_filter))
 
     attr4_filter = request.args.getlist('attr4')
     if attr4_filter:
-        query = query.filter(SampleData.prod_attributes4.in_(attr4_filter))
+        query = query.filter(selected_value_condition(SampleData.prod_attributes4, attr4_filter))
 
     attr5_filter = request.args.getlist('attr5')
     if attr5_filter:
-        query = query.filter(SampleData.prod_attributes5.in_(attr5_filter))
+        query = query.filter(selected_value_condition(SampleData.prod_attributes5, attr5_filter))
+
+    # 当前任务进度使用相同的业务筛选范围，但故意排除 status：完成一条后
+    # 状态会变化，任务分母不应随之缩小。
+    filtered_progress_stats = summarize_status_query(query)
 
     # 状态过滤：status
     status_filter = request.args.getlist('status')
@@ -307,6 +444,11 @@ def samples():
     is_competitor_options = cascade_options['is_competitor']
     total_comments_options = cascade_options['total_comments']
     last_total_comments_options = cascade_options['last_total_comments']
+    filter_attr1_options = cascade_options['attr1']
+    filter_attr2_options = cascade_options['attr2']
+    filter_attr3_options = cascade_options['attr3']
+    filter_attr4_options = cascade_options['attr4']
+    filter_attr5_options = cascade_options['attr5']
 
     # 属性字段选项（候选标签）：仅受 Brand + Attribute1-5 影响，时间/评论量等不参与
     label_options = compute_label_options(
@@ -325,32 +467,20 @@ def samples():
     attr4_options = label_options['attr4']
     attr5_options = label_options['attr5']
 
-    # 进度统计（仅按用户权限范围，不受当前筛选影响），用于在列表页展示进度条
-    prog_query = SampleData.query
-    if current_user.category_arr is not None:
-        prog_query = prog_query.filter(SampleData.category.in_(current_user.category_arr))
-    if current_user.brand_arr is not None:
-        prog_query = prog_query.filter(SampleData.brand.in_(current_user.brand_arr))
-    prog_total = prog_query.count()
-    prog_unlabeled = prog_query.filter(or_(SampleData.status == 'Unlabeled', SampleData.status.is_(None), SampleData.status == '')).count()
-    prog_labeled = prog_query.filter_by(status='Labeled').count()
-    prog_prelabeled = prog_query.filter_by(status='Prelabeled').count()
-    prog_historical = prog_query.filter_by(status='Historical').count()
-    prog_incomplete = prog_query.filter_by(status='Incomplete').count()
-    progress_stats = {
-        'total': prog_total,
-        'unlabeled': prog_unlabeled,
-        'labeled': prog_labeled,
-        'prelabeled': prog_prelabeled,
-        'historical': prog_historical,
-        'incomplete': prog_incomplete,
-    }
+    # 进度统计（仅按用户权限范围，不受当前筛选影响）
+    progress_stats = get_progress_stats_for_user()
 
     return render_template('labeling/samples.html',
                          samples=samples,
                          pagination=pagination,
                          keyword=keyword,
+                         keyword_mode=keyword_mode,
+                         exclude_terms=exclude_terms,
+                         keyword_fields=keyword_field_names,
+                         exclude_fields=exclude_field_names,
+                         empty_filter_value=EMPTY_FILTER_VALUE,
                          progress_stats=progress_stats,
+                         filtered_progress_stats=filtered_progress_stats,
                          status_filter=status_filter_display,
                          eretailer_filter=eretailer_filter,
                          online_store_filter=online_store_filter,
@@ -373,6 +503,11 @@ def samples():
                          is_competitor_options=is_competitor_options,
                          total_comments_options=total_comments_options,
                          last_total_comments_options=last_total_comments_options,
+                         filter_attr1_options=filter_attr1_options,
+                         filter_attr2_options=filter_attr2_options,
+                         filter_attr3_options=filter_attr3_options,
+                         filter_attr4_options=filter_attr4_options,
+                         filter_attr5_options=filter_attr5_options,
                          attr1_options=attr1_options,
                          attr2_options=attr2_options,
                          attr3_options=attr3_options,
@@ -528,8 +663,9 @@ def batch_label():
     # 收集需要透传的筛选条件（用于返回列表时保留 filter）
     filter_keys_multi = ['status', 'eretailer', 'online_store', 'brand', 'note',
                          'is_competitor', 'total_comments', 'last_total_comments',
-                         'attr1', 'attr2', 'attr3', 'attr4', 'attr5']
-    filter_keys_single = ['keyword', 'start_date', 'end_date', 'page']
+                         'attr1', 'attr2', 'attr3', 'attr4', 'attr5',
+                         'keyword_fields', 'exclude_fields']
+    filter_keys_single = ['keyword', 'keyword_mode', 'exclude_terms', 'start_date', 'end_date', 'page']
     source = request.form if request.method == 'POST' else request.args
     saved_filters = {}
     for k in filter_keys_multi:
@@ -680,7 +816,8 @@ def batch_save():
     3. Prelabeled + 没修改 + 没点击"接受" → 保持 Prelabeled（不处理）
     4. Historical + 没修改 → 保持 Historical（不处理）
     5. Historical + 修改了 → Labeled
-    6.（最新修改）满足标注条件（属性1不为空，2-5有一个不为空）→ Labeled，否则 Incomplete
+    6. 标记为疑难 → Uncertain；取消疑难后按属性完整度重新计算状态
+    7. 满足标注条件（属性1不为空，2-5有一个不为空）→ Labeled，否则 Incomplete
     """
     try:
         # 获取所有sample_ids
@@ -691,12 +828,23 @@ def batch_save():
 
         manual_update_count = 0
         prelabel_accept_count = 0
+        uncertain_update_count = 0
 
         # 同一次提交的批量日志打同一个分组 token，便于一键批量回滚
         batch_group = uuid.uuid4().hex[:12]
 
+        valid_sample_ids = []
         for sample_id in sample_ids:
-            sample = SampleData.query.get(int(sample_id))
+            try:
+                valid_sample_ids.append(int(sample_id))
+            except (TypeError, ValueError):
+                continue
+
+        sample_rows = SampleData.query.filter(SampleData.id.in_(valid_sample_ids)).all()
+        sample_map = {str(sample.id): sample for sample in sample_rows}
+
+        for sample_id in sample_ids:
+            sample = sample_map.get(str(sample_id))
             if not sample:
                 continue
 
@@ -721,6 +869,7 @@ def batch_save():
             
             # 获取Prelabeled的接受状态
             accepted = request.form.get(f'accept_{sample_id}') == '1'
+            uncertain_requested = request.form.get(f'uncertain_{sample_id}') == '1'
 
             # 检查是否有手动修改（与原始值比较）
             changed = (
@@ -732,11 +881,11 @@ def batch_save():
             )
 
             is_prelabeled = orig_status == "Prelabeled"
-            is_historical = orig_status == 'Historical'
+            uncertainty_changed = uncertain_requested != (orig_status == 'Uncertain')
 
             # 根据新逻辑处理
-            if changed:
-                # 情况1/5: 有修改，无论之前状态如何
+            if changed or uncertainty_changed:
+                # 属性修改或疑难状态改变时，保存完整行快照。
                 old_snapshot = {
                     'prod_attributes1': orig_attr1, 'prod_attributes2': orig_attr2,
                     'prod_attributes3': orig_attr3, 'prod_attributes4': orig_attr4,
@@ -748,14 +897,18 @@ def batch_save():
                 sample.prod_attributes4 = attr4
                 sample.prod_attributes5 = attr5
                 
-                # 根据新逻辑决定状态
-                if attr1 and any([attr2, attr3, attr4, attr5]):
+                if uncertain_requested:
+                    sample.status = 'Uncertain'
+                elif attr1 and any([attr2, attr3, attr4, attr5]):
                     sample.status = 'Labeled'
                 elif not any([attr1, attr2, attr3, attr4, attr5]):
                     sample.status = 'Unlabeled'
                 else:
                     sample.status = 'Incomplete'
-                manual_update_count += 1
+                if changed:
+                    manual_update_count += 1
+                if uncertainty_changed:
+                    uncertain_update_count += 1
                 new_snapshot = {
                     'prod_attributes1': attr1, 'prod_attributes2': attr2,
                     'prod_attributes3': attr3, 'prod_attributes4': attr4,
@@ -799,6 +952,8 @@ def batch_save():
             flash_messages.append(f'成功保存 {manual_update_count} 条手动修改')
         if prelabel_accept_count > 0:
             flash_messages.append(f'成功接受 {prelabel_accept_count} 条Prelabeled数据')
+        if uncertain_update_count > 0:
+            flash_messages.append(f'更新 {uncertain_update_count} 条疑难标记')
 
         if flash_messages:
             clear_cache()
@@ -813,6 +968,10 @@ def batch_save():
     # 获取当前页码和所有筛选条件
     current_page = int(request.form.get('current_page', 1))
     keyword = request.form.get('keyword', '')
+    keyword_mode = request.form.get('keyword_mode', 'all')
+    exclude_terms = request.form.get('exclude_terms', '')
+    keyword_fields = request.form.getlist('keyword_fields')
+    exclude_fields = request.form.getlist('exclude_fields')
     
     # 获取所有筛选条件（多值字段使用getlist）
     status_filter = request.form.getlist('status')
@@ -835,6 +994,10 @@ def batch_save():
     return redirect(url_for('labeling.samples',
                            page=current_page,
                            keyword=keyword,
+                           keyword_mode=keyword_mode,
+                           exclude_terms=exclude_terms,
+                           keyword_fields=keyword_fields,
+                           exclude_fields=exclude_fields,
                            status=status_filter,
                            eretailer=eretailer_filter,
                            online_store=online_store_filter,
@@ -869,6 +1032,7 @@ def stats():
     prelabeled_count = base_query.filter_by(status='Prelabeled').count()
     historical_count = base_query.filter_by(status='Historical').count()
     incomplete_count = base_query.filter_by(status='Incomplete').count()
+    uncertain_count = base_query.filter_by(status='Uncertain').count()
 
     # 按category统计
     category_stats = {}
@@ -888,6 +1052,7 @@ def stats():
         prelabeled = cat_query.filter_by(status='Prelabeled').count()
         historical = cat_query.filter_by(status='Historical').count()
         incomplete = cat_query.filter_by(status='Incomplete').count()
+        uncertain = cat_query.filter_by(status='Uncertain').count()
         
         # 计算进度
         completed = labeled + historical + incomplete
@@ -900,6 +1065,7 @@ def stats():
             'prelabeled': prelabeled,
             'historical': historical,
             'incomplete': incomplete,
+            'uncertain': uncertain,
             'progress': progress
         }
 
@@ -910,4 +1076,5 @@ def stats():
                            prelabeled_count=prelabeled_count,
                            historical_count=historical_count,
                            incomplete_count=incomplete_count,
+                           uncertain_count=uncertain_count,
                            category_stats=category_stats)

@@ -182,7 +182,7 @@
                 <button type="submit" class="btn btn-success btn-lg">
                     <i class="fas fa-check"></i> {{ t('Confirm Batch Label') }} ({{ samples|length }})
                 </button>
-                <a href="{{ url_for('labeling.samples', **saved_filters) }}" class="btn btn-secondary">
+                <a href="{{ url_for('labeling.samples', **saved_filters) }}" class="btn btn-secondary" id="batchCancelBtn">
                     <i class="fas fa-times"></i> {{ t('Cancel') }}
                 </a>
             </div>
@@ -236,5 +236,16 @@ function refreshBatchOptions() {
 document.querySelectorAll('.attr-batch').forEach(function(input) {
     input.addEventListener('change', refreshBatchOptions);
 });
+
+// 取消优先走浏览器返回，通常可直接命中前页缓存，避免重算列表页。
+const batchCancelBtn = document.getElementById('batchCancelBtn');
+if (batchCancelBtn) {
+    batchCancelBtn.addEventListener('click', function(event) {
+        if (window.history.length > 1) {
+            event.preventDefault();
+            window.history.back();
+        }
+    });
+}
 </script>
 {% endblock %}

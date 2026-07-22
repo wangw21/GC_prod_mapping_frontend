@@ -94,7 +94,7 @@ class SampleData(db.Model):
     prod_attributes4 = db.Column(db.String(255))
     prod_attributes5 = db.Column(db.String(255))
 
-    # 打标状态
+    # 打标状态: Labeled/Unlabeled/Prelabeled/Historical/Incomplete/Uncertain
     status = db.Column(db.String(255), index=True)
 
     def to_dict(self):
@@ -131,6 +131,16 @@ class SampleData(db.Model):
     def is_labeled(self):
         """是否已打标"""
         return self.status in ('Labeled', 'Historical', 'Incomplete')
+
+    @property
+    def preferred_link(self):
+        """Return the business-preferred link for the labeling table."""
+        eretailer = (self.eRetailer or '').strip().upper()
+        url = (self.url or '').strip()
+        sku_url = (self.sku_url or '').strip()
+        if eretailer == 'DOUYIN':
+            return url or None
+        return sku_url or url or None
 
     def __repr__(self):
         return f'<SampleData {self.id}>'

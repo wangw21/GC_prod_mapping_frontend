@@ -5,6 +5,10 @@
 {# Macro: build URL containing all filter conditions #}
 {% macro build_filter_url(page_num) -%}
 {{ url_for('labeling.samples') }}?page={{ page_num }}{%- if keyword -%}&keyword={{ keyword|urlencode }}{%- endif -%}
+{%- if keyword_mode -%}&keyword_mode={{ keyword_mode|urlencode }}{%- endif -%}
+{%- if exclude_terms -%}&exclude_terms={{ exclude_terms|urlencode }}{%- endif -%}
+{%- for field in keyword_fields -%}&keyword_fields={{ field|urlencode }}{%- endfor -%}
+{%- for field in exclude_fields -%}&exclude_fields={{ field|urlencode }}{%- endfor -%}
 {%- for s in status_filter -%}&status={{ s|urlencode }}{%- endfor -%}
 {%- for e in eretailer_filter -%}&eretailer={{ e|urlencode }}{%- endfor -%}
 {%- for o in online_store_filter -%}&online_store={{ o|urlencode }}{%- endfor -%}
@@ -70,54 +74,50 @@
 }
 </style>
 
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2"><i class="fas fa-list"></i> {{ t('Sample List') }}</h1>
-</div>
-
-{% if progress_stats and progress_stats.total > 0 %}
-{% set completed = progress_stats.labeled + progress_stats.historical + progress_stats.incomplete %}
-{% set pct_labeled = (progress_stats.labeled / progress_stats.total * 100)|round(1) %}
-{% set pct_historical = (progress_stats.historical / progress_stats.total * 100)|round(1) %}
-{% set pct_incomplete = (progress_stats.incomplete / progress_stats.total * 100)|round(1) %}
-{% set pct_prelabeled = (progress_stats.prelabeled / progress_stats.total * 100)|round(1) %}
-{% set pct_unlabeled = (progress_stats.unlabeled / progress_stats.total * 100)|round(1) %}
-{% set pct_done = (completed / progress_stats.total * 100)|round(1) %}
-<div class="card mb-3">
-    <div class="card-body py-2">
-        <div class="d-flex justify-content-between align-items-center mb-1">
-            <span class="fw-bold"><i class="fas fa-tasks"></i> {{ t('Labeling Progress') }}</span>
-            <span class="small text-muted">{{ completed }} / {{ progress_stats.total }} ({{ pct_done }}%)</span>
-        </div>
-        <div class="progress" style="height: 22px;">
-            <div class="progress-bar bg-danger" role="progressbar" style="width: {{ pct_unlabeled }}%" title="Unlabeled: {{ progress_stats.unlabeled }}">{{ progress_stats.unlabeled }}</div>
-            <div class="progress-bar bg-warning text-dark" role="progressbar" style="width: {{ pct_prelabeled }}%" title="Prelabeled: {{ progress_stats.prelabeled }}">{{ progress_stats.prelabeled }}</div>
-            <div class="progress-bar bg-info" role="progressbar" style="width: {{ pct_incomplete }}%" title="Incomplete: {{ progress_stats.incomplete }}">{{ progress_stats.incomplete }}</div>
-            <div class="progress-bar bg-success" role="progressbar" style="width: {{ pct_labeled }}%" title="Labeled: {{ progress_stats.labeled }}">{{ progress_stats.labeled }}</div>
-            <div class="progress-bar bg-secondary" role="progressbar" style="width: {{ pct_historical }}%" title="Historical: {{ progress_stats.historical }}">{{ progress_stats.historical }}</div>
-        </div>
-        <div class="d-flex flex-wrap gap-3 mt-1 small">
-            <span><span class="badge bg-danger">&nbsp;</span> {{ t('Unlabeled') }} {{ progress_stats.unlabeled }}</span>
-            <span><span class="badge bg-warning">&nbsp;</span> {{ t('Prelabeled') }} {{ progress_stats.prelabeled }}</span>
-            <span><span class="badge bg-info">&nbsp;</span> {{ t('Incomplete') }} {{ progress_stats.incomplete }}</span>
-            <span><span class="badge bg-success">&nbsp;</span> {{ t('Labeled') }} {{ progress_stats.labeled }}</span>
-            <span><span class="badge bg-secondary">&nbsp;</span> {{ t('Historical') }} {{ progress_stats.historical }}</span>
-        </div>
-    </div>
-</div>
-{% endif %}
-
 <!-- Search and filters -->
-<div class="card mb-3">
-    <div class="card-body">
-        <form method="GET" class="row g-2" id="sampleFilterForm">
-            <!-- Keyword search -->
-            <div class="col-md-3">
-                <label class="form-label small">{{ t('Keyword Search') }}</label>
-                <input type="text" class="form-control form-control-sm" name="keyword" placeholder="{{ t('Product description / brand / category') }}" value="{{ keyword }}">
+<details class="filter-panel mt-3 mb-3" open>
+    <summary>{{ t('Filter and Search') }}</summary>
+    <div class="filter-panel-body">
+        <form method="GET" class="filter-form" id="sampleFilterForm">
+            <div class="filter-search-grid">
+                <section class="filter-search-group" aria-labelledby="keywordSearchLabel">
+                    <div class="filter-search-heading">
+                        <label class="form-label" id="keywordSearchLabel" for="keywordInput">{{ t('Keyword Search') }}</label>
+                        <select class="form-select form-select-sm filter-match-select" name="keyword_mode" id="keywordMode"
+                                aria-label="{{ t('Keyword Match') }}">
+                            <option value="all" {% if keyword_mode == 'all' %}selected{% endif %}>{{ t('Match all terms') }}</option>
+                            <option value="any" {% if keyword_mode == 'any' %}selected{% endif %}>{{ t('Match any term') }}</option>
+                        </select>
+                    </div>
+                    <input type="text" class="form-control form-control-sm" id="keywordInput" name="keyword" maxlength="1000"
+                           placeholder="{{ t('Separate terms with semicolons') }}" value="{{ keyword }}">
+                    <fieldset class="filter-scope">
+                        <legend>{{ t('Search in') }}</legend>
+                        <label class="filter-scope-chip"><input type="checkbox" name="keyword_fields" value="product_description" {% if 'product_description' in keyword_fields %}checked{% endif %}><span>{{ t('Product Description') }}</span></label>
+                        <label class="filter-scope-chip"><input type="checkbox" name="keyword_fields" value="sku" {% if 'sku' in keyword_fields %}checked{% endif %}><span>{{ t('SKU') }}</span></label>
+                        <label class="filter-scope-chip"><input type="checkbox" name="keyword_fields" value="category" {% if 'category' in keyword_fields %}checked{% endif %}><span>{{ t('Category') }}</span></label>
+                    </fieldset>
+                </section>
+
+                <section class="filter-search-group" aria-labelledby="excludeTermsLabel">
+                    <div class="filter-search-heading">
+                        <label class="form-label" id="excludeTermsLabel" for="excludeTermsInput">{{ t('Exclude Terms') }}</label>
+                    </div>
+                    <input type="text" class="form-control form-control-sm" id="excludeTermsInput" name="exclude_terms" maxlength="1000"
+                           placeholder="{{ t('Separate exclusion terms with commas; exclude if any term matches') }}" value="{{ exclude_terms }}">
+                    <fieldset class="filter-scope">
+                        <legend>{{ t('Exclude from') }}</legend>
+                        <label class="filter-scope-chip"><input type="checkbox" name="exclude_fields" value="product_description" {% if 'product_description' in exclude_fields %}checked{% endif %}><span>{{ t('Product Description') }}</span></label>
+                        <label class="filter-scope-chip"><input type="checkbox" name="exclude_fields" value="sku" {% if 'sku' in exclude_fields %}checked{% endif %}><span>{{ t('SKU') }}</span></label>
+                        <label class="filter-scope-chip"><input type="checkbox" name="exclude_fields" value="category" {% if 'category' in exclude_fields %}checked{% endif %}><span>{{ t('Category') }}</span></label>
+                    </fieldset>
+                </section>
             </div>
 
+            <div class="filter-fields-grid">
+
             <!-- eRetailer -->
-            <div class="col-md-2">
+            <div class="filter-field">
                 <label class="form-label small">{{ t('eRetailer') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="eretailer" multiple>
                     {% for option in eretailer_options %}
@@ -127,7 +127,7 @@
             </div>
 
             <!-- online_store -->
-            <div class="col-md-2">
+            <div class="filter-field">
                 <label class="form-label small">{{ t('Online Store') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="online_store" multiple>
                     {% for option in online_store_options %}
@@ -137,7 +137,7 @@
             </div>
 
             <!-- brand -->
-            <div class="col-md-2">
+            <div class="filter-field">
                 <label class="form-label small">{{ t('Brand') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="brand" multiple>
                     {% for option in brand_options %}
@@ -147,7 +147,7 @@
             </div>
 
             <!-- is_competitor -->
-            <div class="col-md-2">
+            <div class="filter-field">
                 <label class="form-label small">{{ t('Is Competitor') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="is_competitor" multiple>
                     {% for option in is_competitor_options %}
@@ -157,7 +157,7 @@
             </div>
 
             <!-- note -->
-            <div class="col-md-1">
+            <div class="filter-field">
                 <label class="form-label small">{{ t('Note') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="note" multiple>
                     {% for option in note_options %}
@@ -167,7 +167,7 @@
             </div>
 
             <!-- status -->
-            <div class="col-md-1">
+            <div class="filter-field">
                 <label class="form-label small">{{ t('Status') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="status" multiple>
                     <option value="Unlabeled" {% if 'Unlabeled' in status_filter %}selected{% endif %}>{{ t('Unlabeled') }}</option>
@@ -175,12 +175,13 @@
                     <option value="Prelabeled" {% if 'Prelabeled' in status_filter %}selected{% endif %}>{{ t('Prelabeled') }}</option>
                     <option value="Historical" {% if 'Historical' in status_filter %}selected{% endif %}>{{ t('Historical') }}</option>
                     <option value="Incomplete" {% if 'Incomplete' in status_filter %}selected{% endif %}>{{ t('Incomplete') }}</option>
+                    <option value="Uncertain" {% if 'Uncertain' in status_filter %}selected{% endif %}>{{ t('Uncertain') }}</option>
                 </select>
             </div>
 
             <!-- Second row -->
             <!-- Review Date Range -->
-            <div class="col-md-4">
+            <div class="filter-field filter-field-wide">
                 <label class="form-label small">{{ t('Review Date Range') }}</label>
                 <div class="input-group input-group-sm">
                     <input type="date" class="form-control" name="start_date" value="{{ start_date or '' }}">
@@ -190,7 +191,7 @@
             </div>
 
             <!-- total_comments -->
-            <div class="col-md-2">
+            <div class="filter-field">
                 <label class="form-label small">{{ t('Total Comments') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="total_comments" multiple>
                     {% for option in total_comments_options %}
@@ -200,7 +201,7 @@
             </div>
 
             <!-- last_total_comments -->
-            <div class="col-md-2">
+            <div class="filter-field">
                 <label class="form-label small">{{ t('Last Total Comments') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="last_total_comments" multiple>
                     {% for option in last_total_comments_options %}
@@ -211,77 +212,158 @@
 
             <!-- Third row: attribute filters -->
             <!-- Attribute 1 -->
-            <div class="col-md-2">
+            <div class="filter-field">
                 <label class="form-label small">{{ t('Attribute 1') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="attr1" multiple>
-                    {% for option in attr1_options %}
-                    <option value="{{ option }}" {% if option in attr1_filter %}selected{% endif %}>{{ option }}</option>
+                    {% for option in filter_attr1_options %}
+                    <option value="{{ option }}" {% if option in attr1_filter %}selected{% endif %}>{{ t('(Empty)') if option == empty_filter_value else option }}</option>
                     {% endfor %}
                 </select>
             </div>
 
             <!-- Attribute 2 -->
-            <div class="col-md-2">
+            <div class="filter-field">
                 <label class="form-label small">{{ t('Attribute 2') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="attr2" multiple>
-                    {% for option in attr2_options %}
-                    <option value="{{ option }}" {% if option in attr2_filter %}selected{% endif %}>{{ option }}</option>
+                    {% for option in filter_attr2_options %}
+                    <option value="{{ option }}" {% if option in attr2_filter %}selected{% endif %}>{{ t('(Empty)') if option == empty_filter_value else option }}</option>
                     {% endfor %}
                 </select>
             </div>
 
             <!-- Attribute 3 -->
-            <div class="col-md-2">
+            <div class="filter-field">
                 <label class="form-label small">{{ t('Attribute 3') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="attr3" multiple>
-                    {% for option in attr3_options %}
-                    <option value="{{ option }}" {% if option in attr3_filter %}selected{% endif %}>{{ option }}</option>
+                    {% for option in filter_attr3_options %}
+                    <option value="{{ option }}" {% if option in attr3_filter %}selected{% endif %}>{{ t('(Empty)') if option == empty_filter_value else option }}</option>
                     {% endfor %}
                 </select>
             </div>
 
             <!-- Attribute 4 -->
-            <div class="col-md-2">
+            <div class="filter-field">
                 <label class="form-label small">{{ t('Attribute 4') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="attr4" multiple>
-                    {% for option in attr4_options %}
-                    <option value="{{ option }}" {% if option in attr4_filter %}selected{% endif %}>{{ option }}</option>
+                    {% for option in filter_attr4_options %}
+                    <option value="{{ option }}" {% if option in attr4_filter %}selected{% endif %}>{{ t('(Empty)') if option == empty_filter_value else option }}</option>
                     {% endfor %}
                 </select>
             </div>
 
             <!-- Attribute 5 -->
-            <div class="col-md-2">
+            <div class="filter-field">
                 <label class="form-label small">{{ t('Attribute 5') }}</label>
                 <select class="form-select form-select-sm multiselect-filter" name="attr5" multiple>
-                    {% for option in attr5_options %}
-                    <option value="{{ option }}" {% if option in attr5_filter %}selected{% endif %}>{{ option }}</option>
+                    {% for option in filter_attr5_options %}
+                    <option value="{{ option }}" {% if option in attr5_filter %}selected{% endif %}>{{ t('(Empty)') if option == empty_filter_value else option }}</option>
                     {% endfor %}
                 </select>
             </div>
 
             <!-- Action buttons -->
-            <div class="col-md-2 d-flex align-items-end">
+            </div>
+            <div class="filter-actions">
                 <button type="submit" class="btn btn-primary btn-sm me-2">
-                    <i class="fas fa-search"></i> {{ t('Filter') }}
+                    {{ t('Filter') }}
                 </button>
-                <a href="{{ url_for('labeling.samples') }}" class="btn btn-secondary btn-sm">
-                    <i class="fas fa-redo"></i> {{ t('Reset') }}
-                </a>
+                <button type="button" class="btn btn-light btn-sm" id="clearFiltersBtn">{{ t('Clear filters') }}</button>
             </div>
         </form>
     </div>
+</details>
+
+{% set overall_completed = progress_stats.labeled + progress_stats.historical + progress_stats.incomplete %}
+{% if filtered_progress_stats and filtered_progress_stats.total > 0 %}
+{% set task_completed = filtered_progress_stats.labeled + filtered_progress_stats.historical + filtered_progress_stats.incomplete %}
+<aside id="labelingProgressDock" class="labeling-progress-dock"
+       data-overall-handled="{{ overall_completed }}" data-overall-uncertain="{{ progress_stats.uncertain }}" data-overall-total="{{ progress_stats.total }}"
+    data-overall-unlabeled="{{ progress_stats.unlabeled }}" data-overall-prelabeled="{{ progress_stats.prelabeled }}"
+    data-overall-labeled="{{ progress_stats.labeled }}" data-overall-incomplete="{{ progress_stats.incomplete }}"
+    data-overall-historical="{{ progress_stats.historical }}"
+       data-task-handled="{{ task_completed }}" data-task-uncertain="{{ filtered_progress_stats.uncertain }}" data-task-total="{{ filtered_progress_stats.total }}">
+    <div class="progress-dock-controls">
+        <div class="progress-scope-switch" role="group" aria-label="{{ t('Progress scope') }}">
+            <button type="button" class="progress-scope-btn" data-progress-scope="overall">{{ t('Overall') }}</button>
+            <button type="button" class="progress-scope-btn" data-progress-scope="task">{{ t('Selected Task') }}</button>
+            <button type="button" class="progress-scope-btn active" data-progress-scope="page">{{ t('Current Page') }}</button>
+        </div>
+        <button type="button" class="floating-controls-toggle" id="floatingControlsToggle"
+                data-pin-label="{{ t('Keep controls floating') }}"
+                data-unpin-label="{{ t('Stop floating controls') }}"
+                title="{{ t('Stop floating controls') }}"
+                aria-label="{{ t('Stop floating controls') }}" aria-pressed="true">
+            <i class="fas fa-thumbtack"></i>
+        </button>
+    </div>
+    <div class="progress-dock-content">
+        <div class="progress-dock-value"><strong id="progressDockPercent">0%</strong><span id="progressDockFraction">0 / {{ samples|length }}</span></div>
+        <div class="progress progress-dock-bar" aria-label="{{ t('Labeling Progress') }}">
+            <div id="progressDockHandledBar" class="progress-bar workflow-progress-segment handled" style="width: 0%"></div>
+            <div id="progressDockUncertainBar" class="progress-bar workflow-progress-segment uncertain" style="width: 0%"></div>
+            <div class="progress-bar status-progress-segment status-unlabeled" data-overall-status="unlabeled"></div>
+            <div class="progress-bar status-progress-segment status-prelabeled" data-overall-status="prelabeled"></div>
+            <div class="progress-bar status-progress-segment status-labeled" data-overall-status="labeled"></div>
+            <div class="progress-bar status-progress-segment status-incomplete" data-overall-status="incomplete"></div>
+            <div class="progress-bar status-progress-segment status-historical" data-overall-status="historical"></div>
+            <div class="progress-bar status-progress-segment status-uncertain" data-overall-status="uncertain"></div>
+        </div>
+        <div class="progress-dock-meta" id="progressDockWorkflowMeta">
+            <span><i class="progress-dot handled"></i>{{ t('Handled') }} <strong id="progressDockHandled">0</strong></span>
+            <span><i class="progress-dot uncertain"></i>{{ t('Uncertain records') }} <strong id="progressDockUncertain">0</strong></span>
+            <span class="text-muted">{{ t('Not handled') }} <strong id="progressDockRemaining">{{ samples|length }}</strong></span>
+        </div>
+        <div class="progress-dock-meta status-progress-meta d-none" id="progressDockStatusMeta">
+            <span><i class="status-dot status-unlabeled"></i>{{ t('Unlabeled') }} <strong>{{ progress_stats.unlabeled }}</strong></span>
+            <span><i class="status-dot status-prelabeled"></i>{{ t('Prelabeled') }} <strong>{{ progress_stats.prelabeled }}</strong></span>
+            <span><i class="status-dot status-labeled"></i>{{ t('Labeled') }} <strong>{{ progress_stats.labeled }}</strong></span>
+            <span><i class="status-dot status-incomplete"></i>{{ t('Incomplete') }} <strong>{{ progress_stats.incomplete }}</strong></span>
+            <span><i class="status-dot status-historical"></i>{{ t('Historical') }} <strong>{{ progress_stats.historical }}</strong></span>
+            <span><i class="status-dot status-uncertain"></i>{{ t('Uncertain') }} <strong>{{ progress_stats.uncertain }}</strong></span>
+        </div>
+    </div>
+</aside>
+{% endif %}
+
+<!-- Checkboxes remain available for clipboard range operations. -->
+<div class="selection-toast d-none" id="batchActionsCard" role="status" aria-live="polite">
+    <div class="selection-toast-content">
+        <span class="selection-toast-icon" aria-hidden="true"><i class="fas fa-check"></i></span>
+        <div class="selection-toast-body">
+            <div class="selection-toast-summary">
+                <strong>{{ t('Selected') }} <span id="selectedCount">0</span> {{ t('record(s)') }}</strong>
+                <span class="selection-toast-meta">
+                    {{ t('Attributes') }} <span id="selectedAttrSummary">1, 2, 3, 4, 5</span>
+                    <span aria-hidden="true">·</span>
+                    <span id="selectedCellCount">0</span> {{ t('cell(s)') }}
+                </span>
+            </div>
+            <div class="selection-toast-shortcuts">
+                <span class="selection-shortcut"><kbd>Ctrl+C</kbd><span>{{ t('Copy') }}</span></span>
+                <span class="selection-shortcut"><kbd>Ctrl+V</kbd><span>{{ t('Paste') }}</span></span>
+                <span class="selection-shortcut"><kbd>Esc</kbd><span>{{ t('Clear selection') }}</span></span>
+                <span class="selection-shortcut selection-shortcut-clear"><kbd>Alt+Delete</kbd><span>{{ t('Clear labels') }}</span></span>
+            </div>
+        </div>
+    </div>
 </div>
 
-<!-- Batch actions -->
-<div class="card mb-3" id="batchActionsCard" style="display: none;">
-    <div class="card-body d-flex align-items-center">
-        <button id="batchLabelBtn" class="btn btn-primary" disabled>
-            <i class="fas fa-tags"></i> {{ t('Batch Label') }}
-        </button>
-        <span class="ms-3 text-muted">
-            {{ t('Selected') }} <span id="selectedCount" class="badge bg-secondary">0</span> {{ t('record(s)') }}
-        </span>
+<div class="modal fade" id="clipboardClearConfirmModal" tabindex="-1" aria-labelledby="clipboardClearConfirmTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content clipboard-confirm-modal">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title" id="clipboardClearConfirmTitle">{{ t('Clear selected labels?') }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ t('Cancel') }}"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0 text-secondary" data-clear-confirm-summary></p>
+                <p class="clipboard-confirm-hint mb-0 mt-2">{{ t('You can press Ctrl+Z to undo before saving.') }}</p>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">{{ t('Cancel') }}</button>
+                <button type="button" class="btn btn-danger" data-clear-confirm-action>{{ t('Clear') }}</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -290,6 +372,14 @@
 <!-- Hidden fields: pass current page number and filter conditions -->
 <input type="hidden" name="current_page" value="{{ pagination.page }}">
 <input type="hidden" name="keyword" value="{{ keyword }}">
+<input type="hidden" name="keyword_mode" value="{{ keyword_mode }}">
+<input type="hidden" name="exclude_terms" value="{{ exclude_terms }}">
+{% for field in keyword_fields %}
+<input type="hidden" name="keyword_fields" value="{{ field }}">
+{% endfor %}
+{% for field in exclude_fields %}
+<input type="hidden" name="exclude_fields" value="{{ field }}">
+{% endfor %}
 {% for s in status_filter %}
 <input type="hidden" name="status" value="{{ s }}">
 {% endfor %}
@@ -333,48 +423,45 @@
 {% endfor %}
 
 <div class="table-responsive">
-    <table class="table table-striped table-hover table-sm table-bordered">
+        <table id="samplesTable" class="table table-hover table-sm table-bordered"
+            data-selection-shortcuts-hint="{{ t('Ctrl+Click attributes to toggle one or more cells in a row; elsewhere toggles a row. Ctrl+Shift+Click selects a row range; Ctrl+Drag paints rows.') }}">
         <thead class="table-dark">
             <tr>
-                <th style="width: 30px;"><input class="form-check-input" type="checkbox" id="selectAllCheckbox"></th>
-                <th style="width: 40px;">{{ t('ID') }}</th>
-                <th style="width: 80px;">{{ t('Brand') }}</th>
-                <th style="width: 300px;">{{ t('Product Description') }}</th>
-                <th style="width: 200px;">{{ t('SKU') }}</th>
-                <th style="width: 50px;">{{ t('Link') }}</th>
-                <th style="width: 50px;">{{ t('Comments') }}</th>
-                <th style="width: 90px;">{{ t('Note') }}</th>
-                <th style="width: 120px;">{{ t('Attribute 1') }}</th>
-                <th style="width: 120px;">{{ t('Attribute 2') }}</th>
-                <th style="width: 120px;">{{ t('Attribute 3') }}</th>
-                <th style="width: 120px;">{{ t('Attribute 4') }}</th>
-                <th style="width: 120px;">{{ t('Attribute 5') }}</th>
-                <th style="width: 70px;">{{ t('Status') }}</th>
+                <th style="width: 26px;"><input class="form-check-input" type="checkbox" id="selectAllCheckbox"></th>
+                <th style="width: 36px;">{{ t('ID') }}</th>
+                <th style="width: 70px;">{{ t('Brand') }}</th>
+                <th style="width: 210px;">{{ t('Product Description') }}</th>
+                <th style="width: 130px;">{{ t('SKU') }}</th>
+                <th style="width: 40px;">{{ t('Link') }}</th>
+                <th style="width: 40px;">{{ t('Comments') }}</th>
+                <th style="width: 75px;">{{ t('Note') }}</th>
+                <th style="width: 170px;" data-label-attr="1">{{ t('Attribute 1') }}</th>
+                <th style="width: 170px;" data-label-attr="2">{{ t('Attribute 2') }}</th>
+                <th style="width: 170px;" data-label-attr="3">{{ t('Attribute 3') }}</th>
+                <th style="width: 170px;" data-label-attr="4">{{ t('Attribute 4') }}</th>
+                <th style="width: 170px;" data-label-attr="5">{{ t('Attribute 5') }}</th>
+                <th style="width: 92px;">{{ t('Status') }}</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="samplesTableBody">
             {% for sample in samples %}
-            <tr>
+            <tr class="{% if sample.status == 'Uncertain' %}row-uncertain{% elif sample.status in ['Labeled', 'Historical', 'Incomplete'] %}row-handled{% endif %}" data-sample-row="{{ sample.id }}" data-sample-id="{{ sample.id }}" data-status="{{ sample.status or '' }}">
                 <td><input class="form-check-input sample-checkbox" type="checkbox" value="{{ sample.id }}"></td>
                 <td>{{ sample.id }}</td>
                 <td>{{ sample.brand }}</td>
                 <td>
-                    <div style="max-width: 300px; word-wrap: break-word; white-space: normal;">
+                    <div style="max-width: 210px; word-wrap: break-word; white-space: normal;">
                         {{ sample.product_description }}
                     </div>
                 </td>
                 <td>
-                    <div style="max-width: 200px; word-wrap: break-word; white-space: normal;">
+                    <div style="max-width: 130px; word-wrap: break-word; white-space: normal;">
                         {{ sample.sku or '-' }}
                     </div>
                 </td>
                 <td>
-                    {% if sample.sku_url %}
-                    <a href="{{ sample.sku_url }}" target="_blank" class="btn btn-sm btn-link sample-link" data-link-id="{{ sample.id }}" title="SKU link">
-                        <i class="fas fa-external-link-alt"></i>
-                    </a>
-                    {% elif sample.url %}
-                    <a href="{{ sample.url }}" target="_blank" class="btn btn-sm btn-link sample-link" data-link-id="{{ sample.id }}" title="Product link">
+                    {% if sample.preferred_link %}
+                    <a href="{{ sample.preferred_link }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-link sample-link" data-link-id="{{ sample.id }}" title="{{ t('Open Product Link') }}">
                         <i class="fas fa-external-link-alt"></i>
                     </a>
                     {% else %}
@@ -390,6 +477,7 @@
                 <td>
                     <input type="hidden" name="sample_ids[]" value="{{ sample.id }}">
                     <input type="hidden" name="status_{{ sample.id }}" value="{{ sample.status or '' }}">
+                    <input type="hidden" class="uncertain-state" name="uncertain_{{ sample.id }}" value="{% if sample.status == 'Uncertain' %}1{% else %}0{% endif %}">
                     <input type="hidden" name="orig_attr1_{{ sample.id }}" value="{{ sample.prod_attributes1 or '' }}">
                     <input type="hidden" name="orig_attr2_{{ sample.id }}" value="{{ sample.prod_attributes2 or '' }}">
                     <input type="hidden" name="orig_attr3_{{ sample.id }}" value="{{ sample.prod_attributes3 or '' }}">
@@ -409,7 +497,7 @@
                                 type="button" 
                                 data-attr="1"
                                 data-sample-id="{{ sample.id }}"
-                                title="{{ t('Add new label') }}">
+                                title="{{ t('Add new label') }} (Alt+Enter)">
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
@@ -429,7 +517,7 @@
                                 type="button" 
                                 data-attr="2"
                                 data-sample-id="{{ sample.id }}"
-                                title="{{ t('Add new label') }}">
+                                title="{{ t('Add new label') }} (Alt+Enter)">
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
@@ -449,7 +537,7 @@
                                 type="button" 
                                 data-attr="3"
                                 data-sample-id="{{ sample.id }}"
-                                title="{{ t('Add new label') }}">
+                                title="{{ t('Add new label') }} (Alt+Enter)">
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
@@ -469,7 +557,7 @@
                                 type="button" 
                                 data-attr="4"
                                 data-sample-id="{{ sample.id }}"
-                                title="{{ t('Add new label') }}">
+                                title="{{ t('Add new label') }} (Alt+Enter)">
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
@@ -489,29 +577,47 @@
                                 type="button" 
                                 data-attr="5"
                                 data-sample-id="{{ sample.id }}"
-                                title="{{ t('Add new label') }}">
+                                title="{{ t('Add new label') }} (Alt+Enter)">
                             <i class="fas fa-plus"></i>
                         </button>
                     </div>
                 </td>
 
-                <td>
+                <td class="status-cell" data-sample-id="{{ sample.id }}">
+                    <div class="status-badge-wrap">
                     {% if sample.status == 'Labeled' %}
-                        <span class="badge bg-success">{{ t('Labeled') }}</span>
+                        <span class="status-text">{{ t('Labeled') }}</span>
                     {% elif sample.status == 'Historical' %}
-                        <span class="badge bg-info">{{ t('Historical') }}</span>
+                        <span class="status-text">{{ t('Historical') }}</span>
                     {% elif sample.status == 'Incomplete' %}
-                        <span class="badge bg-secondary">{{ t('Incomplete') }}</span>
+                        <span class="status-text">{{ t('Incomplete') }}</span>
                     {% elif sample.status == 'Prelabeled' %}
-                        <span class="badge bg-primary">{{ t('Prelabeled') }}</span>
-                        <div class="form-check mt-1">
-                            <input class="form-check-input prelabel-accept" type="checkbox" 
-                                   name="accept_{{ sample.id }}" id="accept_{{ sample.id }}" value="1">
-                            <label class="form-check-label small" for="accept_{{ sample.id }}">{{ t('Accept') }}</label>
-                        </div>
+                        <span class="status-text">{{ t('Prelabeled') }}</span>
+                    {% elif sample.status == 'Uncertain' %}
+                        <span class="status-text">{{ t('Uncertain') }}</span>
                     {% else %}
-                        <span class="badge bg-warning">{{ t('Unlabeled') }}</span>
+                        <span class="status-text">{{ t('Unlabeled') }}</span>
                     {% endif %}
+                    </div>
+                    <div class="status-actions">
+                    {% if sample.status == 'Prelabeled' %}
+                        <label class="status-action status-action-accept" for="accept_{{ sample.id }}"
+                               title="{{ t('Accept') }}" aria-label="{{ t('Accept') }}">
+                            <input class="prelabel-accept visually-hidden" type="checkbox"
+                                   name="accept_{{ sample.id }}" id="accept_{{ sample.id }}" value="1">
+                            <i class="fas fa-check"></i>
+                        </label>
+                    {% endif %}
+                    <button type="button" class="status-action uncertain-toggle"
+                            data-mark-label="{{ t('Mark uncertain') }}"
+                            data-cancel-label="{{ t('Cancel uncertain') }}"
+                            title="{% if sample.status == 'Uncertain' %}{{ t('Cancel uncertain') }}{% else %}{{ t('Mark uncertain') }}{% endif %}"
+                            aria-label="{% if sample.status == 'Uncertain' %}{{ t('Cancel uncertain') }}{% else %}{{ t('Mark uncertain') }}{% endif %}"
+                            aria-pressed="{% if sample.status == 'Uncertain' %}true{% else %}false{% endif %}">
+                        <i class="fas fa-question"></i>
+                        <span class="visually-hidden">{% if sample.status == 'Uncertain' %}{{ t('Cancel uncertain') }}{% else %}{{ t('Mark uncertain') }}{% endif %}</span>
+                    </button>
+                    </div>
                 </td>
             </tr>
             {% else %}
@@ -536,6 +642,12 @@
                     <label class="form-label">{{ t('Attribute 1').split(' ')[0] }} <span id="customLabelAttrNum"></span></label>
                     <input type="text" class="form-control" id="customLabelInput" placeholder="{{ t('Enter new label') }}">
                 </div>
+                <div id="similarLabelsPanel" class="mb-3 d-none" aria-live="polite">
+                    <div class="small fw-semibold text-muted mb-1">{{ t('Similar existing labels') }}</div>
+                    <div id="similarLabelsList" class="d-flex flex-wrap gap-1"></div>
+                    <div id="noSimilarLabels" class="small text-muted d-none">{{ t('No similar existing labels found.') }}</div>
+                    <div id="similarLabelsHint" class="form-text">{{ t('Select an existing label to avoid creating duplicates.') }}</div>
+                </div>
                 <div class="alert alert-warning small mb-0">
                     <i class="fas fa-exclamation-triangle"></i> {{ t('Please confirm the new label does not already exist in the current options, to avoid duplicates or typos.') }}
                 </div>
@@ -550,25 +662,24 @@
 
 <!-- Bottom submit buttons -->
 {% if samples %}
-<div class="card mt-3 mb-3">
-    <div class="card-body">
-        <div class="row">
-            <div class="col-md-8">
-                <button type="submit" class="btn btn-success btn-lg">
-                    <i class="fas fa-save"></i> {{ t('Save Changes on This Page') }}
-                </button>
-                <button type="button" class="btn btn-secondary btn-lg ms-2" onclick="location.reload()">
-                    <i class="fas fa-undo"></i> {{ t('Cancel / Reset') }}
-                </button>
-            </div>
-            <div class="col-md-4 text-end">
-                <small class="text-muted">
-                    {{ t('Modified data becomes LABELED;') }}<br>
-                    {{ t('Prelabeled must be checked as "Accept" to become LABELED;') }}<br>
-                    {{ t('Historical stays unchanged if not modified.') }}
-                </small>
-            </div>
-        </div>
+<div class="labeling-save-bar">
+    <div class="labeling-save-actions">
+        <button type="submit" class="labeling-save-primary" id="saveCurrentPageBtn"
+                data-saving-text="{{ t('Saving, please do not submit again.') }}">
+            {{ t('Save Changes on This Page') }}
+        </button>
+        <button type="button" class="labeling-save-reset" onclick="location.reload()">
+            {{ t('Cancel / Reset') }}
+        </button>
+    </div>
+    <div class="labeling-save-meta">
+        <small id="prelabelPendingCount" class="labeling-save-pending"
+               data-pending-template="{{ t('Pending save on this page: {count}') }}"></small>
+        <button type="button" class="labeling-shortcut-trigger" id="labelingShortcutTrigger"
+            aria-haspopup="dialog" aria-controls="labelingShortcutHelp" title="{{ t('Keyboard shortcuts') }} (Ctrl+/)">
+            <i class="fas fa-keyboard" aria-hidden="true"></i>
+            <span>{{ t('Shortcuts') }}</span>
+        </button>
     </div>
 </div>
 {% endif %}
@@ -576,34 +687,72 @@
 
 <!-- Pagination -->
 {% if pagination.pages > 1 %}
-<nav>
-    <ul class="pagination justify-content-center">
-        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-            <a class="page-link" href="{{ build_filter_url(pagination.prev_num) }}">{{ t('Previous') }}</a>
-        </li>
+<div class="pagination-bar">
+    <div class="pagination-summary">
+        <strong>{{ pagination.total }}</strong>
+        <span>{{ t('records in total') }}</span>
+    </div>
 
-        {% for page_num in pagination.iter_pages(left_edge=2, right_edge=2, left_current=2, right_current=2) %}
-            {% if page_num %}
-                <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
-                    <a class="page-link" href="{{ build_filter_url(page_num) }}">{{ page_num }}</a>
-                </li>
-            {% else %}
-                <li class="page-item disabled"><span class="page-link">...</span></li>
-            {% endif %}
-        {% endfor %}
+    <nav class="pagination-pages" aria-label="{{ t('page') }}">
+        <ul class="pagination mb-0">
+            <li class="page-item page-direction {% if not pagination.has_prev %}disabled{% endif %}">
+                <a class="page-link" href="{{ build_filter_url(pagination.prev_num) }}"{% if not pagination.has_prev %} tabindex="-1" aria-disabled="true"{% endif %}>
+                    <span aria-hidden="true">‹</span>{{ t('Previous') }}
+                </a>
+            </li>
 
-        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-            <a class="page-link" href="{{ build_filter_url(pagination.next_num) }}">{{ t('Next') }}</a>
-        </li>
-    </ul>
-</nav>
-<p class="text-center text-muted">{{ pagination.total }} {{ t('records in total') }}, {{ t('page') }} {{ pagination.page }}/{{ pagination.pages }}</p>
+            {% for page_num in pagination.iter_pages(left_edge=2, right_edge=2, left_current=2, right_current=2) %}
+                {% if page_num %}
+                    <li class="page-item {% if page_num == pagination.page %}active{% endif %}">
+                        <a class="page-link" href="{{ build_filter_url(page_num) }}"{% if page_num == pagination.page %} aria-current="page"{% endif %}>{{ page_num }}</a>
+                    </li>
+                {% else %}
+                    <li class="page-item pagination-ellipsis disabled"><span class="page-link">…</span></li>
+                {% endif %}
+            {% endfor %}
+
+            <li class="page-item page-direction {% if not pagination.has_next %}disabled{% endif %}">
+                <a class="page-link" href="{{ build_filter_url(pagination.next_num) }}"{% if not pagination.has_next %} tabindex="-1" aria-disabled="true"{% endif %}>
+                    {{ t('Next') }}<span aria-hidden="true">›</span>
+                </a>
+            </li>
+        </ul>
+    </nav>
+
+    <form id="pageJumpForm" class="page-jump-form" data-filter-url="{{ build_filter_url(1) }}">
+        <label for="pageJumpInput">{{ t('Go to page') }}</label>
+        <div class="page-jump-control">
+            <input id="pageJumpInput" type="number"
+                   min="1" max="{{ pagination.pages }}" value="{{ pagination.page }}"
+                   aria-label="{{ t('Page number') }}">
+            <button type="submit">{{ t('Go') }}</button>
+        </div>
+    </form>
+</div>
 {% endif %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
 $(document).ready(function() {
+    const EMPTY_FILTER_VALUE = {{ empty_filter_value|tojson }};
+    const EMPTY_FILTER_LABEL = {{ t('(Empty)')|tojson }};
+
+    function filterOptionLabel(value) {
+        return String(value) === EMPTY_FILTER_VALUE ? EMPTY_FILTER_LABEL : value;
+    }
+
+    $('#pageJumpForm').on('submit', function(event) {
+        event.preventDefault();
+        const input = document.getElementById('pageJumpInput');
+        if (!input || !input.reportValidity()) return;
+
+        const page = Number(input.value);
+        const url = new URL(this.dataset.filterUrl, window.location.origin);
+        url.searchParams.set('page', String(page));
+        window.location.assign(url.toString());
+    });
+
     // 字段名 -> 接口键 映射（接口键与后端 CASCADE_FIELD_MAP 一致）
     const filterKeyMap = {
         'eretailer': 'eRetailer',
@@ -616,8 +765,37 @@ $(document).ready(function() {
         'attr1': 'attr1', 'attr2': 'attr2', 'attr3': 'attr3', 'attr4': 'attr4', 'attr5': 'attr5'
     };
 
+    let openFilterSelect = null;
+    let cascadeRefreshPending = false;
+    let cascadeRequest = null;
+    let refreshTimer = null;
+    const FILTER_REFRESH_DEBOUNCE_MS = 180;
+
+    function getSelectedFilterLabels(options) {
+        return options.map(function() {
+            return String($(this).text() || '').trim();
+        }).get().filter(Boolean);
+    }
+
+    function summarizeSelectedFilters(options) {
+        const labels = getSelectedFilterLabels(options);
+        if (labels.length === 0) return '{{ t("Please select") }}';
+        if (labels.length <= 2) return labels.join(' · ');
+        return labels.slice(0, 2).join(' · ') + '  +' + (labels.length - 2);
+    }
+
+    function syncFilterSelectionState(button) {
+        const $button = $(button);
+        const $select = $button.closest('.multiselect-native-select').children('select.multiselect-filter');
+        $button.toggleClass('has-selection', ($select.val() || []).length > 0);
+    }
+
+    $(document).on('change', '.filter-panel .multiselect', function() {
+        syncFilterSelectionState(this);
+    });
+
     // 初始化multiselect插件
-    $('.multiselect-filter').multiselect({
+    $('select.multiselect-filter').multiselect({
         buttonWidth: '100%',
         enableFiltering: true,
         enableCaseInsensitiveFiltering: true,
@@ -625,53 +803,131 @@ $(document).ready(function() {
         nonSelectedText: '{{ t("Please select") }}',
         nSelectedText: '{{ t("selected") }}',
         allSelectedText: '{{ t("Select All") }}',
-        maxHeight: 200,
+        buttonText: function(options) {
+            return summarizeSelectedFilters(options);
+        },
+        buttonTitle: function(options) {
+            const labels = getSelectedFilterLabels(options);
+            return labels.length > 0 ? labels.join(', ') : '{{ t("Please select") }}';
+        },
+        maxHeight: 320,
         buttonClass: 'form-select form-select-sm d-flex align-items-center',
         templates: {
             button: '<button type="button" class="multiselect dropdown-toggle" data-bs-toggle="dropdown"><span class="multiselect-selected-text"></span></button>',
         },
-        // 多级联动：变化时仅更新其它筛选项候选范围，不刷新数据
+        // 下拉框打开期间暂不重建候选项，保留搜索词并允许连续勾选匹配结果。
         onChange: function() {
-            refreshFilterOptions();
+            requestCascadeRefresh();
+        },
+        onDropdownShown: function() {
+            openFilterSelect = this.$select && this.$select[0] ? this.$select[0] : null;
+            positionFilterMenu(this.$select);
+        },
+        onDropdownHidden: function() {
+            const closedSelect = this.$select && this.$select[0] ? this.$select[0] : null;
+            if (openFilterSelect === closedSelect) {
+                openFilterSelect = null;
+            }
+            if (cascadeRefreshPending) {
+                cascadeRefreshPending = false;
+                queueRefreshFilterOptions();
+            }
         }
     });
 
     // 刷新multiselect以确保选中状态正确显示
-    $('.multiselect-filter').multiselect('refresh');
+    $('select.multiselect-filter').multiselect('refresh');
+    $('.filter-panel .multiselect').each(function() {
+        syncFilterSelectionState(this);
+    });
 
-    // 为某个候选列表右上角注入"全选/清空"功能键
+    function positionFilterMenu($select) {
+        if (!$select || !$select.length) return;
+        const $container = $select.closest('.multiselect-native-select');
+        const $menu = $container.find('.multiselect-container');
+        if (!$menu.length) return;
+
+        $menu.css({ left: '0', right: 'auto' });
+        const menuWidth = $menu.outerWidth();
+        const containerRect = $container[0].getBoundingClientRect();
+        if (containerRect.left + menuWidth > window.innerWidth - 12) {
+            $menu.css({ left: 'auto', right: '0' });
+        }
+    }
+
+    // 将搜索、全选和清空整合为同一行工具栏。
     function addSelectClearActions(sel) {
         const $sel = $(sel);
         const $container = $sel.closest('.btn-group, .multiselect-native-select');
         const $menu = $container.find('.dropdown-menu');
         if (!$menu.length || $menu.find('.multiselect-actions').length) return;
-        const $bar = $('<div class="multiselect-actions d-flex justify-content-end gap-2 px-2 py-1 border-bottom"></div>');
-        const $all = $('<button type="button" class="btn btn-link btn-sm p-0 small">{{ t("Select All") }}</button>');
-        const $clear = $('<button type="button" class="btn btn-link btn-sm p-0 small text-secondary">{{ t("Clear") }}</button>');
+        const $filter = $menu.children('.multiselect-filter').first();
+        const $toolbar = $('<div class="multiselect-toolbar"></div>');
+        const $bar = $('<div class="multiselect-actions"></div>');
+        const $all = $('<button type="button" class="multiselect-tool-btn">{{ t("Select All") }}</button>');
+        const $clear = $('<button type="button" class="multiselect-tool-btn text-secondary">{{ t("Clear") }}</button>');
         $all.on('click', function(e) {
             e.preventDefault();
             $sel.multiselect('selectAll', false);
             $sel.multiselect('updateButtonText');
-            refreshFilterOptions();
+            requestCascadeRefresh();
         });
         $clear.on('click', function(e) {
             e.preventDefault();
             $sel.multiselect('deselectAll', false);
             $sel.multiselect('updateButtonText');
-            refreshFilterOptions();
+            requestCascadeRefresh();
         });
         $bar.append($all).append($clear);
-        $menu.prepend($bar);
+        $toolbar.append($filter).append($bar);
+        $menu.prepend($toolbar);
     }
-    $('.multiselect-filter').each(function() { addSelectClearActions(this); });
+    $('select.multiselect-filter').each(function() { addSelectClearActions(this); });
+
+    $('#clearFiltersBtn').on('click', function() {
+        const form = document.getElementById('sampleFilterForm');
+        if (!form) return;
+
+        form.querySelectorAll('input[type="text"], input[type="date"]').forEach(function(input) {
+            input.value = '';
+        });
+        const keywordMode = document.getElementById('keywordMode');
+        if (keywordMode) keywordMode.value = 'all';
+        form.querySelectorAll('input[name="keyword_fields"], input[name="exclude_fields"]').forEach(function(input) {
+            input.checked = true;
+        });
+        $('select.multiselect-filter').each(function() {
+            $(this).multiselect('deselectAll', false);
+            $(this).multiselect('updateButtonText');
+        });
+        requestCascadeRefresh();
+    });
 
     // AJAX 联动：根据当前选择缩小其它筛选项候选项，数据列表仅在点击 Filter 时刷新
-    let cascadeRequest = null;
+    function requestCascadeRefresh() {
+        cascadeRefreshPending = true;
+        if (openFilterSelect) {
+            return;
+        }
+        cascadeRefreshPending = false;
+        queueRefreshFilterOptions();
+    }
+
+    function queueRefreshFilterOptions() {
+        if (refreshTimer) {
+            clearTimeout(refreshTimer);
+        }
+        refreshTimer = setTimeout(refreshFilterOptions, FILTER_REFRESH_DEBOUNCE_MS);
+    }
+
     function refreshFilterOptions() {
+        refreshTimer = null;
         const params = $('#sampleFilterForm').serialize();
         if (cascadeRequest) { cascadeRequest.abort(); }
         cascadeRequest = $.getJSON("{{ url_for('labeling.filter_options') }}", params, function(opts) {
-            $('.multiselect-filter').each(function() {
+            $('select.multiselect-filter').each(function() {
+                // 用户在请求返回前重新打开了该控件时，不打断当前搜索和勾选。
+                if (this === openFilterSelect) return;
                 const name = $(this).attr('name');
                 const key = filterKeyMap[name];
                 if (!key || !opts[key]) return; // status 不参与联动
@@ -681,12 +937,12 @@ $(document).ready(function() {
                 $sel.empty();
                 candidates.forEach(function(v) {
                     const isSel = selected.indexOf(String(v)) !== -1;
-                    $sel.append($('<option>', { value: v, text: v, selected: isSel }));
+                    $sel.append($('<option>', { value: v, text: filterOptionLabel(v), selected: isSel }));
                 });
                 // 保留已选但不在候选范围内的值，避免丢失当前选择
                 selected.forEach(function(v) {
                     if (candidates.map(String).indexOf(String(v)) === -1) {
-                        $sel.append($('<option>', { value: v, text: v, selected: true }));
+                        $sel.append($('<option>', { value: v, text: filterOptionLabel(v), selected: true }));
                     }
                 });
                 $sel.multiselect('rebuild');
@@ -699,20 +955,163 @@ $(document).ready(function() {
 // 属性标签验证和自定义标签逻辑
 let currentInputElement = null;
 let currentAttrNum = null;
+let advanceAfterCustomLabel = false;
+const LIVE_VALIDATION_DELAY_MS = 300;
+const inputValidationTimers = new WeakMap();
+const newLabelHintTemplate = {{ t('New label · Alt+Enter to create')|tojson|safe }};
+
+function advanceFromCommittedLabel(input) {
+    const keyboardApi = window.LabelingKeyboardNavigation;
+    if (!keyboardApi || typeof keyboardApi.advanceAfterLabelCommit !== 'function') return false;
+    return keyboardApi.advanceAfterLabelCommit(input);
+}
 
 // 获取所有属性选项数据
 const attrOptions = {
-    1: JSON.parse('{{ attr1_options|tojson|safe }}'),
-    2: JSON.parse('{{ attr2_options|tojson|safe }}'),
-    3: JSON.parse('{{ attr3_options|tojson|safe }}'),
-    4: JSON.parse('{{ attr4_options|tojson|safe }}'),
-    5: JSON.parse('{{ attr5_options|tojson|safe }}')
+    1: {{ attr1_options|tojson|safe }},
+    2: {{ attr2_options|tojson|safe }},
+    3: {{ attr3_options|tojson|safe }},
+    4: {{ attr4_options|tojson|safe }},
+    5: {{ attr5_options|tojson|safe }}
 };
+
+function normalizeLabelForComparison(value) {
+    return String(value || '').trim().toLocaleLowerCase().replace(/\s+/g, ' ');
+}
+
+function getEditDistance(left, right) {
+    const a = normalizeLabelForComparison(left);
+    const b = normalizeLabelForComparison(right);
+    const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+
+    for (let i = 1; i <= a.length; i++) {
+        let diagonal = previous[0];
+        previous[0] = i;
+        for (let j = 1; j <= b.length; j++) {
+            const above = previous[j];
+            previous[j] = Math.min(
+                previous[j] + 1,
+                previous[j - 1] + 1,
+                diagonal + (a[i - 1] === b[j - 1] ? 0 : 1)
+            );
+            diagonal = above;
+        }
+    }
+
+    return previous[b.length];
+}
+
+function getSimilarLabels(attrNum, query) {
+    const normalizedQuery = normalizeLabelForComparison(query);
+    if (!normalizedQuery || !attrOptions[attrNum]) return [];
+
+    return attrOptions[attrNum]
+        .map(function(option) {
+            const label = String(option).trim();
+            const normalizedLabel = normalizeLabelForComparison(label);
+            const contains = normalizedLabel.includes(normalizedQuery) || normalizedQuery.includes(normalizedLabel);
+            const maxLength = Math.max(normalizedQuery.length, normalizedLabel.length, 1);
+            const similarity = 1 - getEditDistance(normalizedQuery, normalizedLabel) / maxLength;
+            return { label: label, contains: contains, similarity: similarity };
+        })
+        .filter(function(item) {
+            return item.label && (item.contains || item.similarity >= 0.45);
+        })
+        .sort(function(left, right) {
+            if (left.contains !== right.contains) return left.contains ? -1 : 1;
+            if (right.similarity !== left.similarity) return right.similarity - left.similarity;
+            return left.label.localeCompare(right.label);
+        });
+}
+
+function applyExistingLabel(label) {
+    if (!currentInputElement) return;
+
+    currentInputElement.value = label;
+    currentInputElement.classList.remove('is-invalid');
+    currentInputElement.dispatchEvent(new Event('input', { bubbles: true }));
+    currentInputElement.dispatchEvent(new Event('change', { bubbles: true }));
+    advanceAfterCustomLabel = true;
+    bootstrap.Modal.getInstance(document.getElementById('customLabelModal')).hide();
+}
+
+function renderSimilarLabels() {
+    const panel = document.getElementById('similarLabelsPanel');
+    const list = document.getElementById('similarLabelsList');
+    const emptyState = document.getElementById('noSimilarLabels');
+    const hint = document.getElementById('similarLabelsHint');
+    const query = document.getElementById('customLabelInput').value;
+    const similarLabels = getSimilarLabels(currentAttrNum, query);
+
+    list.innerHTML = '';
+    if (!normalizeLabelForComparison(query)) {
+        panel.classList.add('d-none');
+        return;
+    }
+
+    panel.classList.remove('d-none');
+    emptyState.classList.toggle('d-none', similarLabels.length > 0);
+    hint.classList.toggle('d-none', similarLabels.length === 0);
+
+    similarLabels.forEach(function(item) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn btn-outline-primary btn-sm similar-label-btn';
+        button.textContent = item.label;
+        button.title = '{{ t("Use this existing label") }}';
+        button.addEventListener('click', function() {
+            applyExistingLabel(item.label);
+        });
+        list.appendChild(button);
+    });
+}
 
 // 验证输入值是否在选项列表中
 function isValidOption(attrNum, value) {
     if (!value || value.trim() === '') return true; // 空值允许
-    return attrOptions[attrNum].includes(value.trim());
+    return attrOptions[attrNum].some(function(option) {
+        return String(option).trim() === value.trim();
+    });
+}
+
+function formatNewLabelHint(attrNum, value) {
+    return newLabelHintTemplate
+        .replace(/\{attr\}/g, String(attrNum))
+        .replace(/\{value\}/g, String(value));
+}
+
+function updateNewLabelFeedback(input, isNewLabel) {
+    const inputGroup = input.closest('.input-group');
+    if (!inputGroup) return;
+
+    const addButton = inputGroup.querySelector('.add-custom-label-btn');
+
+    if (addButton && !addButton.dataset.defaultTitle) {
+        addButton.dataset.defaultTitle = addButton.title || '';
+        addButton.dataset.defaultAriaLabel = addButton.getAttribute('aria-label') || '';
+    }
+
+    if (!isNewLabel) {
+        inputGroup.classList.remove('has-new-label-warning');
+        if (addButton) {
+            addButton.classList.remove('new-label-pending');
+            addButton.title = addButton.dataset.defaultTitle || addButton.title;
+            if (addButton.dataset.defaultAriaLabel) {
+                addButton.setAttribute('aria-label', addButton.dataset.defaultAriaLabel);
+            } else {
+                addButton.removeAttribute('aria-label');
+            }
+        }
+        return;
+    }
+
+    const message = formatNewLabelHint(input.dataset.attr, input.value.trim());
+    inputGroup.classList.add('has-new-label-warning');
+    if (addButton) {
+        addButton.classList.add('new-label-pending');
+        addButton.title = message;
+        addButton.setAttribute('aria-label', message);
+    }
 }
 
 // 为输入框添加视觉反馈
@@ -723,6 +1122,7 @@ function updateInputValidation(input) {
     
     if (value === '') {
         input.classList.remove('is-invalid', 'is-valid');
+        updateNewLabelFeedback(input, false);
         return true;
     }
     
@@ -733,16 +1133,19 @@ function updateInputValidation(input) {
     // 如果当前值等于原始值（未修改），则认为有效
     if (value === origValue) {
         input.classList.remove('is-invalid', 'is-valid');
+        updateNewLabelFeedback(input, false);
         return true;
     }
     
     if (isValidOption(attrNum, value)) {
         input.classList.remove('is-invalid');
         input.classList.add('is-valid');
+        updateNewLabelFeedback(input, false);
         return true;
     } else {
         input.classList.remove('is-valid');
         input.classList.add('is-invalid');
+        updateNewLabelFeedback(input, true);
         return false;
     }
 }
@@ -750,13 +1153,40 @@ function updateInputValidation(input) {
 // 监听所有属性输入框的change和blur事件
 document.querySelectorAll('.attr-input').forEach(function(input) {
     input.addEventListener('blur', function() {
+        const timer = inputValidationTimers.get(this);
+        if (timer) clearTimeout(timer);
+        inputValidationTimers.delete(this);
         updateInputValidation(this);
     });
     
-    input.addEventListener('input', function() {
-        // 实时移除错误提示，但不添加正确提示
-        if (this.classList.contains('is-invalid')) {
-            updateInputValidation(this);
+    input.addEventListener('input', function(event) {
+        const currentInput = this;
+        const previousTimer = inputValidationTimers.get(currentInput);
+        if (previousTimer) clearTimeout(previousTimer);
+
+        // 输入过程中先清除旧状态，停止输入 300ms 后再显示本次判断结果。
+        currentInput.classList.remove('is-invalid', 'is-valid');
+        updateNewLabelFeedback(currentInput, false);
+
+        if (currentInput.value.trim() === '') {
+            inputValidationTimers.delete(currentInput);
+            return;
+        }
+
+        const timer = setTimeout(function() {
+            inputValidationTimers.delete(currentInput);
+            updateInputValidation(currentInput);
+        }, LIVE_VALIDATION_DELAY_MS);
+        inputValidationTimers.set(currentInput, timer);
+
+        // Chromium reports a datalist pick as replacement text. Defer navigation
+        // until the selected value has fully propagated through the input event.
+        if (event.isTrusted && event.inputType === 'insertReplacementText') {
+            setTimeout(function() {
+                if (document.activeElement === currentInput) {
+                    advanceFromCommittedLabel(currentInput);
+                }
+            }, 0);
         }
     });
 });
@@ -790,7 +1220,7 @@ function buildRowDatalists(sampleId) {
         dl.id = id;
         (attrOptions[n] || []).forEach(function(v) {
             const o = document.createElement('option');
-            o.value = v;
+            o.value = String(v).trim();
             dl.appendChild(o);
         });
         document.body.appendChild(dl);
@@ -819,14 +1249,15 @@ function refreshRowLabelOptions(sampleId) {
             if (!dl) continue;
             dl.innerHTML = '';
             (opts[`attr${n}`] || []).forEach(function(v) {
+                const normalizedValue = String(v).trim();
                 const o = document.createElement('option');
-                o.value = v;
+                o.value = normalizedValue;
                 dl.appendChild(o);
                 // 关键修复：把服务端返回的联动候选并入全局校验集，
                 // 保证"下拉里出现的合法DB值"不会被校验判为"新标签"。
                 // （全局 attrOptions 初始受 1000 上限与筛选范围限制，可能不含联动候选）
-                if (attrOptions[n] && attrOptions[n].indexOf(v) === -1) {
-                    attrOptions[n].push(v);
+                if (attrOptions[n] && !isValidOption(n, normalizedValue)) {
+                    attrOptions[n].push(normalizedValue);
                 }
             });
         }
@@ -835,6 +1266,7 @@ function refreshRowLabelOptions(sampleId) {
 
 // 初始化每行 datalist，并绑定联动
 const rowNarrowed = {};
+window.rowNarrowed = rowNarrowed;
 document.querySelectorAll('.attr-input').forEach(function(input) {
     buildRowDatalists(input.dataset.sampleId);
     // 首次聚焦该行时，立即按"本行 brand + 已填 attr"收窄下拉，
@@ -846,8 +1278,16 @@ document.querySelectorAll('.attr-input').forEach(function(input) {
             refreshRowLabelOptions(sid);
         }
     });
-    input.addEventListener('change', function() {
+    input.addEventListener('change', function(event) {
         refreshRowLabelOptions(this.dataset.sampleId);
+        const committedInput = this;
+        if (event.isTrusted && document.activeElement === committedInput) {
+            setTimeout(function() {
+                if (document.activeElement === committedInput) {
+                    advanceFromCommittedLabel(committedInput);
+                }
+            }, 0);
+        }
     });
 });
 
@@ -858,10 +1298,22 @@ document.querySelectorAll('.add-custom-label-btn').forEach(function(btn) {
         const sampleId = this.dataset.sampleId;
         currentInputElement = document.querySelector(`input[name="attr${attrNum}_${sampleId}"]`);
         currentAttrNum = attrNum;
+        advanceAfterCustomLabel = false;
+        const seedValue = currentInputElement ? currentInputElement.value : '';
         
         document.getElementById('customLabelAttrNum').textContent = attrNum;
-        document.getElementById('customLabelInput').value = '';
-        new bootstrap.Modal(document.getElementById('customLabelModal')).show();
+        const customLabelInput = document.getElementById('customLabelInput');
+        customLabelInput.value = seedValue;
+        renderSimilarLabels();
+
+        const modalEl = document.getElementById('customLabelModal');
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+        modalEl.addEventListener('shown.bs.modal', function onShown() {
+            customLabelInput.focus();
+            customLabelInput.setSelectionRange(customLabelInput.value.length, customLabelInput.value.length);
+            modalEl.removeEventListener('shown.bs.modal', onShown);
+        });
     });
 });
 
@@ -896,19 +1348,52 @@ document.getElementById('confirmCustomLabel').addEventListener('click', function
         // 标记为有效
         currentInputElement.classList.remove('is-invalid');
         currentInputElement.classList.add('is-valid');
+        currentInputElement.dispatchEvent(new Event('input', { bubbles: true }));
+        currentInputElement.dispatchEvent(new Event('change', { bubbles: true }));
+        advanceAfterCustomLabel = true;
     }
     
     bootstrap.Modal.getInstance(document.getElementById('customLabelModal')).hide();
 });
 
+// 在新建标签弹窗内按 Enter 时，优先确认新标签，不触发表单保存
+document.getElementById('customLabelInput').addEventListener('keydown', function(event) {
+    if (event.key !== 'Enter') {
+        return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    document.getElementById('confirmCustomLabel').click();
+});
+
+document.getElementById('customLabelInput').addEventListener('input', renderSimilarLabels);
+
 // 模态框关闭时清理
 document.getElementById('customLabelModal').addEventListener('hidden.bs.modal', function() {
+    const returnInput = currentInputElement;
+    const shouldAdvance = advanceAfterCustomLabel;
     currentInputElement = null;
     currentAttrNum = null;
+    advanceAfterCustomLabel = false;
+
+    // 确认标签后前进到下一属性；取消弹窗时仍恢复到原属性。
+    if (returnInput && document.contains(returnInput)) {
+        setTimeout(function() {
+            if (!shouldAdvance || !advanceFromCommittedLabel(returnInput)) {
+                returnInput.focus({ preventScroll: true });
+                returnInput.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            }
+        }, 0);
+    }
 });
 
 // 表单提交验证和确认
 document.getElementById('batchEditForm').addEventListener('submit', function(e) {
+    if (typeof window.refreshLabelingRowProgress === 'function') {
+        window.refreshLabelingRowProgress();
+    }
+
     // 先验证所有属性输入框
     const attrInputs = document.querySelectorAll('.attr-input');
     let hasInvalidInput = false;
@@ -940,38 +1425,43 @@ document.getElementById('batchEditForm').addEventListener('submit', function(e) 
         return;
     }
     
-    // 验证通过，显示确认对话框
-    const confirmationMessage = "{{ t('Save changes on this page?') }}";
+    // 验证通过，显示确认对话框（包含当前页接受/修改摘要）
+    const acceptedCount = document.querySelectorAll('.prelabel-accept:checked').length;
+    let modifiedCount = 0;
+    document.querySelectorAll('tr[data-sample-id]').forEach(function(row) {
+        const sampleId = row.dataset.sampleId;
+        if (!sampleId) {
+            return;
+        }
+        let rowModified = false;
+        for (let attrNum = 1; attrNum <= 5; attrNum += 1) {
+            const currentInput = row.querySelector(`input[name="attr${attrNum}_${sampleId}"]`);
+            const origInput = row.querySelector(`input[name="orig_attr${attrNum}_${sampleId}"]`);
+            const currentValue = currentInput ? (currentInput.value || '').trim() : '';
+            const origValue = origInput ? (origInput.value || '').trim() : '';
+            if (currentValue !== origValue) {
+                rowModified = true;
+                break;
+            }
+        }
+        if (rowModified) {
+            modifiedCount += 1;
+        }
+    });
+
+    const uncertainCount = Array.from(document.querySelectorAll('.uncertain-state'))
+        .filter(input => input.value === '1').length;
+    const summaryTemplate = {{ t('About to save current page: accept {accepted} Prelabeled, manually edited {modified}, uncertain {uncertain}. Continue?')|tojson|safe }};
+    const confirmationMessage = summaryTemplate
+        .replace(/\{accepted\}/g, String(acceptedCount))
+        .replace(/\{modified\}/g, String(modifiedCount))
+        .replace(/\{uncertain\}/g, String(uncertainCount));
     if (!confirm(confirmationMessage)) {
         e.preventDefault();
     }
 });
 
-// 快捷键支持: Enter保存
-document.addEventListener('keydown', function(event) {
-    // 只在非输入框、非textarea、非select元素上监听Enter，或者在属性输入框上按Enter
-    const isAttrInput = event.target.classList.contains('attr-input');
-    const isFormElement = event.target.tagName === 'INPUT' || 
-                         event.target.tagName === 'TEXTAREA' || 
-                         event.target.tagName === 'SELECT';
-    
-    if (event.key === 'Enter') {
-        // 如果是属性输入框按Enter，触发保存
-        if (isAttrInput) {
-            event.preventDefault();
-            const form = document.getElementById('batchEditForm');
-            const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
-            form.dispatchEvent(submitEvent);
-            if (!submitEvent.defaultPrevented) {
-                form.submit();
-            }
-        }
-        // 如果是在其他表单元素（搜索框等），让浏览器默认行为处理
-        // 如果不是在任何输入元素上，也不做处理
-    }
-});
-
-// 批量选择逻辑
+// 链接状态记忆（选择状态管理由 labeling-clipboard.js 统一处理）
 document.addEventListener('DOMContentLoaded', function() {
     // Link 点击记忆：已点击过的链接显示不同颜色
     const VISITED_KEY = 'visitedSampleLinks';
@@ -990,70 +1480,193 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    const selectAllCheckbox = document.getElementById('selectAllCheckbox');
-    const sampleCheckboxes = document.querySelectorAll('.sample-checkbox');
-    const batchActionsCard = document.getElementById('batchActionsCard');
-    const batchLabelBtn = document.getElementById('batchLabelBtn');
-    const selectedCountBadge = document.getElementById('selectedCount');
-
-    function updateBatchActions() {
-        const selectedCheckboxes = document.querySelectorAll('.sample-checkbox:checked');
-        const count = selectedCheckboxes.length;
-
-        selectedCountBadge.textContent = count;
-
-        if (count > 0) {
-            batchActionsCard.style.display = 'block';
-            batchLabelBtn.disabled = false;
-        } else {
-            batchActionsCard.style.display = 'none';
-            batchLabelBtn.disabled = true;
-        }
-    }
-
-    // "全选" 复选框逻辑
-    if (selectAllCheckbox) {
-        selectAllCheckbox.addEventListener('change', function() {
-            sampleCheckboxes.forEach(checkbox => {
-                checkbox.checked = this.checked;
-            });
-            updateBatchActions();
-        });
-    }
-
-    // 单个复选框逻辑
-    sampleCheckboxes.forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            if (!this.checked) {
-                if (selectAllCheckbox) {
-                    selectAllCheckbox.checked = false;
-                }
-            } else {
-                const allChecked = Array.from(sampleCheckboxes).every(c => c.checked);
-                if (allChecked && selectAllCheckbox) {
-                    selectAllCheckbox.checked = true;
-                }
-            }
-            updateBatchActions();
-        });
-    });
-
-    // 批量打标按钮点击事件
-    if (batchLabelBtn) {
-        batchLabelBtn.addEventListener('click', function() {
-            const selectedIds = Array.from(document.querySelectorAll('.sample-checkbox:checked'))
-                                     .map(cb => cb.value)
-                                     .join(',');
-            if (selectedIds) {
-                // 附带当前筛选条件，批量打标后可返回并保留 filter
-                const filters = $('#sampleFilterForm').serialize();
-                window.location.href = "{{ url_for('labeling.batch_label') }}?ids=" + selectedIds + (filters ? "&" + filters : "");
-            }
-        });
-    }
-
-    // 初始化状态
-    updateBatchActions();
 });
 </script>
+<script>
+window.labelingClipboardI18n = {
+    toastCopiedRow: {{ t('Copied labels from the current row.')|tojson|safe }},
+    toastCopiedRows: {{ t('Copied labels from {rows} rows.')|tojson|safe }},
+    toastPastedCurrentRow: {{ t('Pasted into current row')|tojson|safe }},
+    toastPastedRows: {{ t('Pasted into {rows} rows')|tojson|safe }},
+    toastPastedRowsAndFields: {{ t('Pasted into {rows} rows · {fields} labels updated.')|tojson|safe }},
+    toastOverflowIgnored: {{ t('Columns beyond Attribute 5 were ignored')|tojson|safe }},
+    toastSingleGroupOnly: {{ t('Current quick paste supports only one attribute group')|tojson|safe }},
+    toastMultiRowNotSupported: {{ t('Current quick paste supports only one attribute group, please copy one row only.')|tojson|safe }},
+    toastSourceTargetMismatch: {{ t('Source and target row counts do not match.')|tojson|safe }},
+    toastInsufficientRowsOnPage: {{ t('Clipboard contains {rows} rows, but only {capacity} rows remain from the current position.')|tojson|safe }},
+    toastInsufficientAttrSpace: {{ t('Starting from Attribute {start}, only {capacity} columns are available, but clipboard has {cols} columns.')|tojson|safe }},
+    toastTooManyColumnsWithoutHeader: {{ t('Clipboard has more than 5 columns without recognizable attribute headers. Please copy only Attribute 1-5 or include standard headers.')|tojson|safe }},
+    toastDuplicateHeader: {{ t('Duplicate attribute headers detected. Paste was canceled.')|tojson|safe }},
+    toastNoTarget: {{ t('Please click a target attribute, or select rows to paste.')|tojson|safe }},
+    toastNoValueChanged: {{ t('Labels unchanged · marked as handled.')|tojson|safe }},
+    toastUndoSuccess: {{ t('Paste undone · restored {rows} rows and {fields} labels.')|tojson|safe }},
+    toastCopiedAttrRange: {{ t('Selected labels copied.')|tojson|safe }},
+    toastNoUndo: {{ t('No paste operation can be undone.')|tojson|safe }},
+    toastUndoUnsafe: {{ t('Some pasted values were modified again, so this paste cannot be safely undone.')|tojson|safe }},
+    toastRowCleared: {{ t('Cleared {fields} labels from the current row. Press Ctrl+Z to undo.')|tojson|safe }},
+    toastRowsCleared: {{ t('Cleared {fields} labels from {rows} rows. Press Ctrl+Z to undo.')|tojson|safe }},
+    toastRowAlreadyEmpty: {{ t('This row has no labels to clear.')|tojson|safe }},
+    confirmClearTemplate: {{ t('This will clear {fields} labels from {rows} selected rows.')|tojson|safe }},
+    confirmOverwriteTemplate: {{ t('{overwriteFields} existing labels will be replaced.')|tojson|safe }},
+    confirmRepeatTemplate: {{ t('The copied labels will repeat across {targetRows} rows.')|tojson|safe }},
+    confirmRepeatAndOverwriteTemplate: {{ t('Repeated fill · {overwriteFields} existing labels will be replaced.')|tojson|safe }},
+    batchOverwriteConfirmTemplate: {{ t('Will paste into {rows} rows, and {overwrites} rows already have values that will be overwritten. Continue?')|tojson|safe }},
+    selectionShortcutsHint: {{ t('Ctrl+Click attributes to toggle one or more cells in a row; elsewhere toggles a row. Ctrl+Shift+Click selects a row range; Ctrl+Drag paints rows.')|tojson|safe }}
+};
+
+{% if current_lang == 'zh' %}
+    Object.assign(window.labelingClipboardI18n, {
+        toastCopiedRow: '已复制当前行的标签',
+        toastCopiedRows: '已复制 {rows} 行标签',
+        toastPastedCurrentRow: '已粘贴到当前行',
+        toastPastedRows: '已粘贴到 {rows} 行',
+        toastPastedRowsAndFields: '已粘贴到 {rows} 行 · 更新 {fields} 个标签',
+        toastOverflowIgnored: '超出 Attribute 5 的列已忽略',
+        toastSingleGroupOnly: '当前快捷粘贴仅支持一组属性',
+        toastMultiRowNotSupported: '当前快捷粘贴仅支持一组属性，请只复制一行数据。',
+        toastSourceTargetMismatch: '源行与目标行数量不匹配。',
+        toastInsufficientRowsOnPage: '剪贴板包含 {rows} 行，但当前位置只能容纳 {capacity} 行。',
+        toastInsufficientAttrSpace: '从 Attribute {start} 开始只能容纳 {capacity} 列，但复制内容包含 {cols} 列。',
+        toastTooManyColumnsWithoutHeader: '复制内容超过 5 列且没有识别到属性表头。请只复制 Attribute 1-5，或同时复制标准表头。',
+        toastDuplicateHeader: '属性表头重复，已取消粘贴。',
+        toastNoTarget: '请先点击目标属性，或勾选需要填充的数据。',
+        toastNoValueChanged: '标签未变化，已标记为处理。',
+        toastUndoSuccess: '已撤销粘贴 · 恢复 {rows} 行、{fields} 个标签',
+        toastCopiedAttrRange: '已复制选中的标签',
+        toastNoUndo: '没有可撤销的粘贴。',
+        toastUndoUnsafe: '粘贴后的部分属性已被再次修改，无法安全撤销本次粘贴。',
+        toastRowCleared: '已清除当前行 {fields} 个标签，可按 Ctrl+Z 撤销。',
+        toastRowsCleared: '已清除 {rows} 行中的 {fields} 个标签，可按 Ctrl+Z 撤销。',
+        toastRowAlreadyEmpty: '当前行没有可清除的标签。',
+        confirmClearTemplate: '将清除所选 {rows} 行中的 {fields} 个非空标签。',
+        confirmOverwriteTemplate: '将替换 {overwriteFields} 个已有标签',
+        confirmRepeatTemplate: '复制的标签将循环填充到 {targetRows} 行',
+        confirmRepeatAndOverwriteTemplate: '循环填充 · 将替换 {overwriteFields} 个已有标签',
+        batchOverwriteConfirmTemplate: '将粘贴到 {rows} 行，其中 {overwrites} 行已有属性，现有值将被覆盖。是否继续？',
+        selectionShortcutsHint: 'Ctrl+单击属性格可组合选择或取消多个属性；在行内其他位置切换单行。Ctrl+Shift+单击选择行范围，Ctrl+拖动刷选行。'
+    });
+    {% endif %}
+</script>
+<script src="{{ url_for('static', filename='js/labeling-clipboard.js') }}"></script>
+<script>
+window.prelabelReviewI18n = {
+    acceptedPendingSave: {{ t('Accepted, pending save')|tojson|safe }},
+    pageReviewDone: {{ t('All prelabeled records on this page reviewed. Please save this page.')|tojson|safe }},
+    pendingCountText: {{ t('Pending save on this page: {count}')|tojson|safe }},
+    noReviewableRows: {{ t('No reviewable records currently.')|tojson|safe }},
+    modifiedCannotAccept: {{ t('Modified attributes cannot be accepted as prelabeled. Save them as manual edits instead.')|tojson|safe }},
+    nonPrelabeledCannotAccept: {{ t('Only prelabeled rows can be accepted.')|tojson|safe }},
+    undoNoAction: {{ t('No prelabel accept action to undo.')|tojson|safe }},
+    undoApplied: {{ t('Undid prelabel accept status change.')|tojson|safe }},
+    undoConflict: {{ t('The accept status changed again, cannot safely undo this action.')|tojson|safe }},
+    acceptanceCanceledAfterEdit: {{ t('Prelabel acceptance was canceled because the attributes were modified.')|tojson|safe }}
+};
+
+{% if current_lang == 'zh' %}
+Object.assign(window.prelabelReviewI18n, {
+    acceptedPendingSave: '已接受 · 待保存',
+    pageReviewDone: '当前页的预标注数据已全部审核，请保存当前页。',
+    pendingCountText: '本页待保存 {count} 条',
+    noReviewableRows: '当前没有可审核的数据。',
+    modifiedCannotAccept: '属性已修改，不能接受为预打标；请按手工修改保存。',
+    nonPrelabeledCannotAccept: '当前行不是 Prelabeled 数据，不能执行接受操作。',
+    undoNoAction: '没有可撤销的预打标接受操作。',
+    undoApplied: '已撤销预打标接受状态变更。',
+    undoConflict: '接受状态已被再次修改，无法安全撤销该操作。',
+    acceptanceCanceledAfterEdit: '属性已修改，已自动取消该行的 Prelabeled 接受状态。'
+});
+{% endif %}
+</script>
+<script src="{{ url_for('static', filename='js/labeling-prelabel-review.js') }}"></script>
+<script>
+window.labelingKeyboardI18n = {
+    layoutUserKey: {{ current_user.id|tojson|safe }},
+    alreadyFirstRecord: {{ t('Already at the first record on current page.')|tojson|safe }},
+    alreadyLastRecord: {{ t('Already at the last record on current page.')|tojson|safe }},
+    noEditableData: {{ t('No editable records on current page.')|tojson|safe }},
+    savingInProgress: {{ t('Saving, please do not submit again.')|tojson|safe }},
+    noActiveRowToClear: {{ t('No active row to clear.')|tojson|safe }},
+    noActiveRowToMarkUncertain: {{ t('Select a row before marking it uncertain.')|tojson|safe }},
+    shortcutHelpTitle: {{ t('Keyboard shortcuts')|tojson|safe }},
+    shortcutHelpClose: {{ t('Close shortcut help')|tojson|safe }},
+    shortcutHelpDrag: {{ t('Drag this header to move the panel')|tojson|safe }},
+    shortcutHelpResize: {{ t('Drag the lower-right corner to resize the panel')|tojson|safe }},
+    shortcutHelpPin: {{ t('Keep floating on the page')|tojson|safe }},
+    shortcutGroupCommon: {{ t('Common actions')|tojson|safe }},
+    shortcutGroupEditing: {{ t('Editing and navigation')|tojson|safe }},
+    shortcutGroupReview: {{ t('Prelabeled review')|tojson|safe }},
+    shortcutGroupSelection: {{ t('Selection and clipboard')|tojson|safe }},
+    shortcutHelp: {{ t('Open or close keyboard shortcut help')|tojson|safe }},
+    shortcutUncertain: {{ t('Mark or unmark the active row as uncertain')|tojson|safe }},
+    undoUncertainApplied: {{ t('Undid uncertain status change.')|tojson|safe }},
+    shortcutF2: {{ t('Enter or exit attribute editing')|tojson|safe }},
+    shortcutEnter: {{ t('Confirm the current label and move forward')|tojson|safe }},
+    shortcutTab: {{ t('Move between attributes and rows')|tojson|safe }},
+    shortcutNewLabel: {{ t('Create a new label for the current attribute')|tojson|safe }},
+    shortcutSave: {{ t('Save the current page')|tojson|safe }},
+    shortcutClearRow: {{ t('Clear the selected range or current row')|tojson|safe }},
+    shortcutArrows: {{ t('Move the active review row')|tojson|safe }},
+    shortcutSpace: {{ t('Accept the active prelabeled row')|tojson|safe }},
+    shortcutEditAccept: {{ t('Accept the current prelabeled row while editing')|tojson|safe }},
+    shortcutEditArrows: {{ t('Move rows while keeping the current attribute')|tojson|safe }},
+    shortcutCopy: {{ t('Copy the selected labels')|tojson|safe }},
+    shortcutPaste: {{ t('Paste labels into the selection')|tojson|safe }},
+    shortcutCopyPaste: {{ t('Copy or paste selected labels')|tojson|safe }},
+    shortcutUndo: {{ t('Undo the most recent labeling action')|tojson|safe }},
+    shortcutMultiSelect: {{ t('Toggle rows or attribute cells in the selection')|tojson|safe }},
+    shortcutRangeSelect: {{ t('Select a continuous row range')|tojson|safe }},
+    shortcutDragSelect: {{ t('Paint-select multiple rows')|tojson|safe }},
+    shortcutEscape: {{ t('Clear row and attribute selections')|tojson|safe }}
+};
+
+{% if current_lang == 'zh' %}
+Object.assign(window.labelingKeyboardI18n, {
+    alreadyFirstRecord: '已到当前页第一条。',
+    alreadyLastRecord: '已到当前页最后一条。',
+    noEditableData: '当前页没有可编辑数据。',
+    savingInProgress: '正在保存，请勿重复提交。',
+    noActiveRowToClear: '当前没有可清除的活动行。',
+    noActiveRowToMarkUncertain: '请先选择一行，再标记疑难。',
+    shortcutHelpTitle: '键盘快捷键',
+    shortcutHelpClose: '关闭快捷键提示',
+    shortcutHelpDrag: '拖动标题栏可移动面板',
+    shortcutHelpResize: '拖动右下角可调整面板大小',
+    shortcutHelpPin: '保持悬浮在页面',
+    shortcutGroupCommon: '常用操作',
+    shortcutGroupEditing: '编辑与导航',
+    shortcutGroupReview: 'Prelabeled 审核',
+    shortcutGroupSelection: '选择与剪贴板',
+    shortcutHelp: '打开或关闭快捷键说明',
+    shortcutUncertain: '标记或取消当前行疑难状态',
+    undoUncertainApplied: '已撤销疑难状态更改。',
+    shortcutF2: '进入或退出属性编辑',
+    shortcutEnter: '确认当前标签并向后移动',
+    shortcutTab: '在属性及数据行之间移动',
+    shortcutNewLabel: '为当前属性新建标签',
+    shortcutSave: '保存当前页',
+    shortcutClearRow: '清除所选范围或当前行',
+    shortcutArrows: '移动当前审核行',
+    shortcutSpace: '接受当前 Prelabeled 数据',
+    shortcutEditAccept: '编辑时接受当前 Prelabeled 数据',
+    shortcutEditArrows: '保持当前属性列并切换数据行',
+    shortcutCopy: '复制所选标签',
+    shortcutPaste: '将标签粘贴到选区',
+    shortcutCopyPaste: '复制或粘贴所选标签',
+    shortcutUndo: '撤销最近一次打标操作',
+    shortcutMultiSelect: '组合选择或取消数据行、属性格',
+    shortcutRangeSelect: '选择连续的数据行范围',
+    shortcutDragSelect: '拖动刷选多行数据',
+    shortcutEscape: '清除行选区和属性选区'
+});
+{% endif %}
+</script>
+<script src="{{ url_for('static', filename='js/labeling-keyboard-navigation.js') }}"></script>
+<script>
+window.labelingColumnResizeConfig = {
+    userKey: {{ current_user.id|tojson|safe }},
+    resizeTitle: {{ t('Drag to resize this attribute column')|tojson|safe }}
+};
+</script>
+<script src="{{ url_for('static', filename='js/labeling-column-resize.js') }}"></script>
+<script src="{{ url_for('static', filename='js/labeling-row-progress.js') }}"></script>
 {% endblock %}
